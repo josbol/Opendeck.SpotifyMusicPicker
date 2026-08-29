@@ -15,7 +15,7 @@ window.connectElgatoStreamDeckSocket = function (port, inUuid, registerEvent, in
     if (msg.event === "didReceiveSettings") { settings = msg.payload.settings || {}; render(); }
     if (msg.event === "didReceiveGlobalSettings") { globalSettings = msg.payload.settings || {}; render(); }
     if (msg.event === "sendToPropertyInspector" && msg.payload) {
-      if (msg.payload.globalSettings) globalSettings = Object.assign({}, msg.payload.globalSettings);
+      // the plugin also echoes its view of the global settings; OpenDeck's copy (didReceiveGlobalSettings) stays the source of truth
       if (msg.payload.status) status = msg.payload.status;
       render();
     }

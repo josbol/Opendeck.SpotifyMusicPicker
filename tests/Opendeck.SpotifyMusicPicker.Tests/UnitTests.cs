@@ -126,7 +126,7 @@ public class MadeForYouTests
     }
 
     [Theory]
-    [InlineData("Daily Mix 1", 0)] [InlineData("daily mix 6", 5)] [InlineData("daylist • cosy evening", 6)] [InlineData("Release Radar", 8)] [InlineData("Something Else", 500)] [InlineData(null, 1000)]
+    [InlineData("Daily Mix 1", 0)] [InlineData("daily mix 6", 5)] [InlineData("Daily Mix 12", 11)] [InlineData("daylist • cosy evening", 100)] [InlineData("Release Radar", 102)] [InlineData("Something Else", 500)] [InlineData(null, 1000)]
     public void RankFollowsTheCanonicalOrder(string? name, int rank) => Assert.Equal(rank, MadeForYou.Rank(name));
 }
 

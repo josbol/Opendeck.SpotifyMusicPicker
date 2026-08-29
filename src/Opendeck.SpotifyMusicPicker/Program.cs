@@ -13,7 +13,7 @@ http.DefaultRequestHeaders.UserAgent.ParseAdd("opendeck-spotifymusicpicker/" + (
 Curator NewCurator()
 {
     var auth = new SpotifyAuth(http);
-    var curator = new Curator(new SpotifyClient(auth, http), auth, new PlayHistory(Paths.HistoryFile), new MetadataCache(Paths.MetadataFile), new ArtCache(http, Paths.ArtDir));
+    var curator = new Curator(new SpotifyClient(auth, http), auth, new PlayHistory(Paths.HistoryFile), new MetadataCache(Paths.MetadataFile), new ArtCache(http, Paths.ArtDir), new OEmbedClient(http));
     GlobalSettings.LoadFromDisk().ApplyTo(curator.Settings);
     return curator;
 }

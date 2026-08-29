@@ -32,7 +32,7 @@ Spotify's API rules changed twice (November 2024, February 2026) and this plugin
 
 | Row | Source |
 |---|---|
-| Made for you | `GET /me/playlists`, playlists owned by `spotify`. Apps created after 27 Nov 2024 without a quota extension do not get them (they are omitted or `null`, in search too — verified). Then: paste their share links in the settings (*Made-for-you links*, one per line, optional name after `\|`). Playback still works; the cover is learned from the songs you play from it. A mix you play in the Spotify app also appears by itself (its context URI is in the play history; Spotify refuses its name, so it is "Spotify mix" until you name it). |
+| Made for you | `GET /me/playlists`, playlists owned by `spotify`. Apps created after 27 Nov 2024 without a quota extension do not get them (they are omitted or `null`, in search too — verified). Then: paste their share links in the settings (*Made-for-you links*, one per line; the ids are stable). Name and today's cover come from Spotify's public **oEmbed** endpoint (`open.spotify.com/oembed?url=…`, no auth, refreshed every 2 h — the Daily Mix covers change daily); an optional name after `\|` overrides the title. A mix you play in the Spotify app also appears by itself: its context URI is in the play history and oEmbed names it. Playback works through the normal player endpoint. |
 | Most played | `GET /me/player/recently-played` polled every few minutes into a local history (`~/.local/share/opendeck-spotifymusicpicker/history.json`); `GET /me/top/tracks` while the history is short |
 | Suggested | `GET /me/albums` (saved albums not played lately), `GET /me/top/artists` + `GET /me/following` → `GET /artists/{id}/albums`; `/recommendations`, `/browse/new-releases` and `related-artists` are gone |
 | Now playing / transport / volume | the player endpoints (`/me/player…`), `playerctl -p spotify` as fallback |
@@ -69,8 +69,8 @@ you install as a symlink.
    Without a browser on the machine: `opendeck-spotifymusicpicker --login <client id>` prints the URL.
 3. The rows fill in a few seconds. Made for you empty? On a new app it will be: paste the playlists' share links
    (Spotify app → *Made For You* → playlist → ⋯ → Share → Copy link) into *Made-for-you links*, one per line, e.g.
-   `https://open.spotify.com/playlist/37i9dQZF1E3…?si=… | Daily Mix 1`. The ids of Daily Mix 1–6, Discover Weekly,
-   Release Radar and daylist are stable for your account, so this is a one-time paste.
+   `https://open.spotify.com/playlist/37i9dQZF1E3…?si=…`. Names and covers are fetched for you; the ids of Daily
+   Mix 1–6, Discover Weekly, Release Radar and daylist are stable for your account, so this is a one-time paste.
 
 ### The "Spotify" profile (D200X)
 

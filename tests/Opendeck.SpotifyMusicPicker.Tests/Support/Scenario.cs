@@ -42,6 +42,13 @@ public static class Scenario
         }));
         api.Json("GET", "/v1/artists/arA", TestData.Artist("arA", "Artist A"));
         api.Json("GET", "/v1/playlists/HID2", FakeSpotify.SpotifyError(404, "Resource not found"), 404);
+        // Spotify's public oEmbed endpoint still describes what the API refuses
+        api.Json("GET", "/oembed", (req, _) => req.QueryString["url"] switch
+        {
+            "https://open.spotify.com/playlist/HID" => (200, new { title = "Daily Mix 2", thumbnail_url = Img("blue"), thumbnail_width = 300, thumbnail_height = 300 }),
+            "https://open.spotify.com/playlist/HID2" => (200, new { title = "Daily Mix 9", thumbnail_url = Img("red"), thumbnail_width = 300, thumbnail_height = 300 }),
+            _ => (404, (object?)new { error = "not found" }),
+        });
         api.Json("GET", "/v1/albums/A", albumA); api.Json("GET", "/v1/albums/B", albumB); api.Json("GET", "/v1/albums/C", albumC); api.Json("GET", "/v1/albums/D", albumD); api.Json("GET", "/v1/albums/E", albumE);
         api.Json("GET", "/v1/playlists/mine", TestData.Playlist("mine", "My Jams", "jos", Img("grey")));
         api.Json("GET", "/v1/playlists/HID", FakeSpotify.SpotifyError(404, "Resource not found"), 404);
@@ -79,7 +86,7 @@ public static class Scenario
         File.WriteAllText(tokens, JsonSerializer.Serialize(new TokenSet { ClientId = "cid", AccessToken = "tok", RefreshToken = "ref", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1), UserName = "Jos" }));
         var auth = new SpotifyAuth(http, tokens) { AccountsUrl = api.AccountsUrl, ApiUrl = api.ApiUrl };
         var client = new SpotifyClient(auth, http) { BaseUrl = api.ApiUrl };
-        var curator = new Curator(client, auth, new PlayHistory(Path.Combine(dir, "history.json")), new MetadataCache(Path.Combine(dir, "meta.json")), new ArtCache(http, Path.Combine(dir, "art")))
+        var curator = new Curator(client, auth, new PlayHistory(Path.Combine(dir, "history.json")), new MetadataCache(Path.Combine(dir, "meta.json")), new ArtCache(http, Path.Combine(dir, "art")), new OEmbedClient(http) { BaseUrl = $"http://127.0.0.1:{api.Port}/oembed" })
         {
             HostName = () => "laptopjos",
         };

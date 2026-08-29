@@ -8,21 +8,25 @@ public sealed record ManualLink(string Uri, string? Name);
 /// <summary>The playlists Spotify generates for the user (Daily Mix, Discover Weekly, …).</summary>
 public static partial class MadeForYou
 {
-    /// <summary>Display order; anything else Spotify-owned follows alphabetically.</summary>
+    /// <summary>Display order after the Daily Mixes; anything else Spotify-owned follows alphabetically.</summary>
     public static readonly string[] Order =
     {
-        "Daily Mix 1", "Daily Mix 2", "Daily Mix 3", "Daily Mix 4", "Daily Mix 5", "Daily Mix 6",
         "daylist", "Discover Weekly", "Release Radar", "On Repeat", "Repeat Rewind", "Time Capsule",
         "Your Top Songs", "Your Summer Rewind", "New Music Friday",
     };
+
+    [GeneratedRegex(@"^daily mix (\d{1,2})\b", RegexOptions.IgnoreCase)]
+    private static partial Regex DailyMix();
 
     public static bool IsSpotifyOwned(PlaylistInfo p) => string.Equals(p.OwnerId, "spotify", StringComparison.OrdinalIgnoreCase);
 
     public static int Rank(string? name)
     {
         if (string.IsNullOrEmpty(name)) return 1000;
+        var mix = DailyMix().Match(name);
+        if (mix.Success) return int.Parse(mix.Groups[1].Value) - 1;      // Daily Mix 1, 2, … first
         for (var i = 0; i < Order.Length; i++)
-            if (name.StartsWith(Order[i], StringComparison.OrdinalIgnoreCase)) return i;
+            if (name.StartsWith(Order[i], StringComparison.OrdinalIgnoreCase)) return 100 + i;
         return 500;
     }
 

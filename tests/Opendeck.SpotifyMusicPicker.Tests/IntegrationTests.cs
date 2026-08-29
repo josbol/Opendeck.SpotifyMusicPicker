@@ -30,13 +30,13 @@ public class CuratorIntegrationTests : IDisposable
         Assert.True(s.Connected); Assert.Null(s.Error);
         Assert.Equal(2, s.HiddenPlaylists);
 
-        Assert.Equal(new[] { "Daily Mix 1", "Daily Mix 2", "Discover Weekly", "Spotify mix" }, s.MadeForYou.Select(i => i.Name));
+        Assert.Equal(new[] { "Daily Mix 1", "Daily Mix 2", "Daily Mix 9", "Discover Weekly" }, s.MadeForYou.Select(i => i.Name));
         var dm2 = s.MadeForYou[1];
-        Assert.True(dm2.MetadataMissing);
-        Assert.Equal(_api.ImageUrl("grey.png"), dm2.ImageUrl);                       // learned from the track played from it
+        Assert.False(dm2.MetadataMissing);                                            // the API refused it, oEmbed described it
+        Assert.Equal(_api.ImageUrl("blue.png"), dm2.ImageUrl);                       // today's cover from oEmbed, not the learned art
         Assert.False(s.MadeForYou[0].MetadataMissing);
-        Assert.Equal("spotify:playlist:HID2", s.MadeForYou[3].Uri);                   // discovered from the play history
-        Assert.Contains("played from the Spotify app", s.MadeForYou[3].Source);
+        Assert.Equal("spotify:playlist:HID2", s.MadeForYou[2].Uri);                   // discovered from the play history, named by oEmbed
+        Assert.Contains("played from the Spotify app", s.MadeForYou[2].Source);
 
         // album A (3 plays) > playlist (2) > artist (1); then top tracks fill up, the other edition of album A is skipped
         Assert.Equal(new[] { "spotify:album:A", "spotify:playlist:mine", "spotify:artist:arA", "spotify:album:D", "spotify:album:E" }, s.Frequent.Select(i => i.Uri));
@@ -55,6 +55,7 @@ public class CuratorIntegrationTests : IDisposable
         Assert.Equal(first, _curator.Current.Recommended.Select(r => r.Uri));      // same day, same picks
         Assert.Equal(1, _api.Count("GET", "/v1/playlists/HID"));                     // the refusal is cached
         Assert.Equal(1, _api.Count("GET", "/v1/playlists/HID2"));
+        Assert.Equal(2, _api.Count("GET", "/oembed"));                                // one per hidden mix, cached for hours
         Assert.Equal(1, _api.Count("GET", "/v1/albums/A"));
 
         _curator.Reroll();

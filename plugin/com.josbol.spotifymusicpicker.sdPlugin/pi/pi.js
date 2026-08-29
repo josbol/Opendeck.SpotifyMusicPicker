@@ -65,7 +65,7 @@ const GLOBAL_HTML = `
 <h3>Rows</h3>
 <div class="row"><label for="g-madeForYouLinks">Made-for-you links</label></div>
 <textarea id="g-madeForYouLinks" placeholder="https://open.spotify.com/playlist/37i9dQZF1E3… | Daily Mix 1&#10;spotify:playlist:37i9dQZF1E… | Discover Weekly"></textarea>
-<div class="hint">Spotify hides its own playlists (Daily Mix, Discover Weekly…) from apps created after Nov 2024 — in your library and in search. Paste their share links here (Spotify app → playlist → ⋯ → Share → Copy link), one per line, with a name after "|". Mixes you play in the Spotify app appear on the row by themselves as "Spotify mix": copy their URI from the status below and add a line here to name them. Covers are learned from the songs you play from them.</div>
+<div class="hint">Spotify hides its own playlists (Daily Mix, Discover Weekly…) from apps created after Nov 2024 — in your library and in search. Paste their share links here (Spotify app → playlist → ⋯ → Share → Copy link), one per line; the name and today's cover come from Spotify's public embed endpoint (add "| name" to override the name). Mixes you play in the Spotify app appear on the row by themselves.</div>
 <div class="row"><label for="g-historyDays">Most played: days</label><input type="number" id="g-historyDays" min="1" max="180"></div>
 <div class="row"><label for="g-showLabels">Names on covers</label><input type="checkbox" id="g-showLabels"></div>
 <h3>Playback</h3>

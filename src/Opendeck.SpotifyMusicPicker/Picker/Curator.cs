@@ -30,6 +30,7 @@ public sealed class Curator : IDisposable
     public PlayHistory History { get; }
     public MetadataCache Meta { get; }
     public ArtCache Art { get; }
+    public OEmbedClient OEmbed { get; }
     public CuratorSettings Settings { get; set; } = new();
     public Snapshot Current { get; private set; } = new() { At = DateTimeOffset.UtcNow };
     /// <summary>Picker keys are on screen: poll playback quickly.</summary>
@@ -49,9 +50,9 @@ public sealed class Curator : IDisposable
     private int _pendingVolume = -1;
     private int _volumeSending;
 
-    public Curator(SpotifyClient client, SpotifyAuth auth, PlayHistory history, MetadataCache meta, ArtCache art)
+    public Curator(SpotifyClient client, SpotifyAuth auth, PlayHistory history, MetadataCache meta, ArtCache art, OEmbedClient oembed)
     {
-        Client = client; Auth = auth; History = history; Meta = meta; Art = art;
+        Client = client; Auth = auth; History = history; Meta = meta; Art = art; OEmbed = oembed;
         auth.Changed += () => { RequestLists(); RequestPlayback(); };
     }
 
@@ -213,7 +214,12 @@ public sealed class Curator : IDisposable
             if (!item.MetadataMissing) { result.Add(item); continue; }
             var meta = await ResolveMetaAsync(item.Uri, item.Kind, ct);
             if (meta is { Missing: false })
-                result.Add(item with { Name = meta.Name ?? item.Name, ImageUrl = meta.ImageUrl ?? item.ImageUrl, Subtitle = item.Subtitle, MetadataMissing = false });
+                result.Add(item with
+                {
+                    Name = item.Name != MadeForYou.UnnamedMix ? item.Name : meta.Name ?? item.Name,   // a name given with the link wins
+                    ImageUrl = meta.ImageUrl ?? item.ImageUrl, MetadataMissing = false,
+                    Source = meta.SpotifyOwned ? "configured link, cover from Spotify" : "configured link",
+                });
             else result.Add(item);
         }
         return result;
@@ -232,12 +238,12 @@ public sealed class Curator : IDisposable
         {
             if (s.Kind != ItemKind.Playlist || known.Contains(s.Uri)) continue;
             var meta = await ResolveMetaAsync(s.Uri, ItemKind.Playlist, ct);
-            if (meta is not { Missing: true }) continue;
+            if (meta is null || !(meta.Missing || meta.SpotifyOwned)) continue;
             found.Add(new PickItem
             {
-                Uri = s.Uri, Kind = ItemKind.Playlist, Name = MadeForYou.UnnamedMix, Subtitle = "Made for you",
-                ImageUrl = learned.GetValueOrDefault(s.Uri) ?? s.SampleImage, Score = s.Score, MetadataMissing = true,
-                Source = $"played from the Spotify app ({s.Plays} plays); paste its link with a name in the settings",
+                Uri = s.Uri, Kind = ItemKind.Playlist, Name = meta.Name ?? MadeForYou.UnnamedMix, Subtitle = "Made for you",
+                ImageUrl = meta.ImageUrl ?? learned.GetValueOrDefault(s.Uri) ?? s.SampleImage, Score = s.Score, MetadataMissing = meta.Missing,
+                Source = $"played from the Spotify app ({s.Plays} plays)" + (meta.Missing ? "; paste its link with a name in the settings" : ""),
             });
         }
         return found;
@@ -327,8 +333,17 @@ public sealed class Curator : IDisposable
             case ItemKind.Playlist:
             {
                 var f = await Client.PlaylistAsync(id, ct);
-                if (f.Value is { } p) entry = new() { Uri = uri, Kind = kind, Name = p.Name, Subtitle = MadeForYou.IsSpotifyOwned(p) ? "Made for you" : p.OwnerName is { Length: > 0 } o ? $"by {o}" : "Playlist", ImageUrl = p.ImageUrl, FetchedAt = now };
-                else if (f.Refused) refused = true; else failed = true;
+                if (f.Value is { } p)
+                    entry = new() { Uri = uri, Kind = kind, Name = p.Name, Subtitle = MadeForYou.IsSpotifyOwned(p) ? "Made for you" : p.OwnerName is { Length: > 0 } o ? $"by {o}" : "Playlist", ImageUrl = p.ImageUrl, FetchedAt = now, SpotifyOwned = MadeForYou.IsSpotifyOwned(p), Volatile = MadeForYou.IsSpotifyOwned(p) };
+                else if (f.Refused)
+                {
+                    // Spotify's own mixes: the Web API refuses them, its public oEmbed endpoint still names them and has today's cover
+                    var o = await OEmbed.GetAsync(uri, ct);
+                    if (o.Value is { } info) entry = new() { Uri = uri, Kind = kind, Name = info.Title, Subtitle = "Made for you", ImageUrl = info.ThumbnailUrl, FetchedAt = now, SpotifyOwned = true, Volatile = true };
+                    else if (o.Response.Status == 0) failed = true;   // network trouble: keep what we know, ask again later
+                    else refused = true;
+                }
+                else failed = true;
                 break;
             }
             case ItemKind.Artist:

@@ -17,6 +17,10 @@ public sealed class MetadataCache
         public DateTimeOffset FetchedAt { get; set; }
         /// <summary>Spotify refused it (404/403): an algorithmic playlist on a restricted app, or something deleted.</summary>
         public bool Missing { get; set; }
+        /// <summary>One of Spotify's own playlists (owner "spotify", or described through oEmbed after the API refused it).</summary>
+        public bool SpotifyOwned { get; set; }
+        /// <summary>Its cover and title change daily (Daily Mix, daylist…): remembered for hours, not days.</summary>
+        public bool Volatile { get; set; }
     }
 
     private readonly Dictionary<string, Entry> _map = new();
@@ -26,6 +30,7 @@ public sealed class MetadataCache
 
     public TimeSpan Ttl { get; set; } = TimeSpan.FromDays(7);
     public TimeSpan MissingTtl { get; set; } = TimeSpan.FromDays(1);
+    public TimeSpan VolatileTtl { get; set; } = TimeSpan.FromHours(2);
 
     public MetadataCache(string? file)
     {
@@ -33,7 +38,8 @@ public sealed class MetadataCache
         if (file is null || !File.Exists(file)) return;
         try
         {
-            foreach (var e in JsonSerializer.Deserialize<List<Entry>>(File.ReadAllText(file), Json.Options) ?? new()) _map[e.Uri] = e;
+            foreach (var e in JsonSerializer.Deserialize<List<Entry>>(File.ReadAllText(file), Json.Options) ?? new())
+                if (!e.Missing) _map[e.Uri] = e;   // a refusal is re-checked after a restart: one request, and the fallbacks may know it now
         }
         catch (Exception ex) { Log.Warn($"metadata cache: {ex.Message}"); }
     }
@@ -41,7 +47,7 @@ public sealed class MetadataCache
     public Entry? Get(string uri, DateTimeOffset now)
     {
         lock (_lock)
-            return _map.TryGetValue(uri, out var e) && now - e.FetchedAt < (e.Missing ? MissingTtl : Ttl) ? e : null;
+            return _map.TryGetValue(uri, out var e) && now - e.FetchedAt < (e.Missing ? MissingTtl : e.Volatile ? VolatileTtl : Ttl) ? e : null;
     }
 
     /// <summary>Whatever is known, however old (when Spotify cannot be reached).</summary>

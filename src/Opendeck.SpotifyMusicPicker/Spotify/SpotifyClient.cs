@@ -108,6 +108,12 @@ public sealed class SpotifyClient
         return new(r.Ok ? ParseAlbum(r.Body) : null, r);
     }
 
+    public async Task<Fetched<ArtistInfo>> ArtistAsync(string id, CancellationToken ct)
+    {
+        var r = await GetAsync($"/artists/{id}", ct);
+        return new(r.Ok ? ParseArtist(r.Body) : null, r);
+    }
+
     public async Task<List<AlbumInfo>> ArtistAlbumsAsync(string artistId, CancellationToken ct, int limit = 50)
     {
         var r = await GetAsync($"/artists/{artistId}/albums?include_groups=album&limit={limit}", ct);

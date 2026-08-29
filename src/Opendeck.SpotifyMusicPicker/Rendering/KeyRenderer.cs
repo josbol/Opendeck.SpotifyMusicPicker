@@ -58,7 +58,7 @@ public sealed class KeyRenderer
         if (!drewArt) DrawTile(c, item, new SKRect(0, 0, Size, Size));
         if (showLabel || !drewArt)
         {
-            var subtitle = item.Kind == ItemKind.Album ? item.Subtitle : null;
+            var subtitle = item.Kind is ItemKind.Album or ItemKind.Artist ? item.Subtitle : null;
             var lines = Wrap(item.Name, 15, Size - 16, 2, bold: true).Count;
             var top = Size - (lines * 19 + (subtitle is null ? 0 : 15) + 12);
             Gradient(c, new SKRect(0, top - 30, Size, Size), SKColors.Transparent, SKColors.Black.WithAlpha(215));

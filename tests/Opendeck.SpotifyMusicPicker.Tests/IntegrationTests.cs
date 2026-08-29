@@ -30,16 +30,20 @@ public class CuratorIntegrationTests : IDisposable
         Assert.True(s.Connected); Assert.Null(s.Error);
         Assert.Equal(2, s.HiddenPlaylists);
 
-        Assert.Equal(new[] { "Daily Mix 1", "Daily Mix 2", "Discover Weekly" }, s.MadeForYou.Select(i => i.Name));
+        Assert.Equal(new[] { "Daily Mix 1", "Daily Mix 2", "Discover Weekly", "Spotify mix" }, s.MadeForYou.Select(i => i.Name));
         var dm2 = s.MadeForYou[1];
         Assert.True(dm2.MetadataMissing);
         Assert.Equal(_api.ImageUrl("grey.png"), dm2.ImageUrl);                       // learned from the track played from it
         Assert.False(s.MadeForYou[0].MetadataMissing);
+        Assert.Equal("spotify:playlist:HID2", s.MadeForYou[3].Uri);                   // discovered from the play history
+        Assert.Contains("played from the Spotify app", s.MadeForYou[3].Source);
 
-        Assert.Equal(new[] { "spotify:album:A", "spotify:playlist:mine", "spotify:album:D", "spotify:album:E" }, s.Frequent.Select(i => i.Uri));
+        // album A (3 plays) > playlist (2) > artist (1); then top tracks fill up, the other edition of album A is skipped
+        Assert.Equal(new[] { "spotify:album:A", "spotify:playlist:mine", "spotify:artist:arA", "spotify:album:D", "spotify:album:E" }, s.Frequent.Select(i => i.Uri));
+        Assert.Equal(("Artist A", "Artist"), (s.Frequent[2].Name, s.Frequent[2].Subtitle));
         Assert.Equal("3 plays in 30 days", s.Frequent[0].Source); Assert.Equal("Artist A", s.Frequent[0].Subtitle);
         Assert.Equal(("My Jams", "by jos"), (s.Frequent[1].Name, s.Frequent[1].Subtitle));
-        Assert.Equal("3 of your top tracks", s.Frequent[2].Source);
+        Assert.Equal("3 of your top tracks", s.Frequent[3].Source);
 
         Assert.Equal(3, s.Recommended.Count);
         Assert.All(s.Recommended, r => Assert.Contains(r.Uri, new[] { "spotify:album:S1", "spotify:album:X1", "spotify:album:X2", "spotify:album:Y1" }));
@@ -50,11 +54,12 @@ public class CuratorIntegrationTests : IDisposable
         await _curator.RefreshListsAsync(CancellationToken.None);
         Assert.Equal(first, _curator.Current.Recommended.Select(r => r.Uri));      // same day, same picks
         Assert.Equal(1, _api.Count("GET", "/v1/playlists/HID"));                     // the refusal is cached
+        Assert.Equal(1, _api.Count("GET", "/v1/playlists/HID2"));
         Assert.Equal(1, _api.Count("GET", "/v1/albums/A"));
 
         _curator.Reroll();
         Assert.Equal(3, _curator.Current.Recommended.Count);
-        Assert.Equal(6, s.HistoryPlays);
+        Assert.Equal(8, s.HistoryPlays);
     }
 
     [Fact]

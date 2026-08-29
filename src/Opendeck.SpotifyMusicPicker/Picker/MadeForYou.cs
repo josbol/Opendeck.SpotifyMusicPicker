@@ -44,8 +44,13 @@ public static partial class MadeForYou
                     ImageUrl = learnedArt is not null && learnedArt.TryGetValue(m.Uri, out var art) ? art : null,
                     Source = "configured link", MetadataMissing = true,
                 });
-        return list.OrderBy(i => Rank(i.Name)).ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        return Sort(list);
     }
+
+    public static List<PickItem> Sort(IEnumerable<PickItem> items) => items.OrderBy(i => Rank(i.Name)).ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>Name for a playlist Spotify refuses to describe: an algorithmic mix played from the Spotify app.</summary>
+    public const string UnnamedMix = "Spotify mix";
 
     /// <summary>
     /// One link per line: a share URL or URI, optionally followed by "|" (or a space) and a name.

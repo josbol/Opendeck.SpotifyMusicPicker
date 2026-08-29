@@ -63,6 +63,7 @@ if (args.Length > 0 && args[0].StartsWith("--"))
                 ("profile", "/me"), ("my playlists", "/me/playlists?limit=50"), ("recently played", "/me/player/recently-played?limit=5"),
                 ("top artists", "/me/top/artists?limit=5"), ("top tracks", "/me/top/tracks?limit=5"), ("saved albums", "/me/albums?limit=5"),
                 ("followed artists", "/me/following?type=artist&limit=5"), ("player", "/me/player"), ("devices", "/me/player/devices"),
+                ("search", "/search?q=Daily%20Mix%201&type=playlist&limit=10"),
             })
             {
                 var r = await curator.Client.GetAsync(path, CancellationToken.None);
@@ -73,6 +74,11 @@ if (args.Length > 0 && args[0].StartsWith("--"))
                     var hidden = items.Count(i => i.ValueKind != JsonValueKind.Object);
                     var spotify = items.Count(i => i.Obj("owner")?.Str("id") == "spotify");
                     extra = $"  ({items.Count} on the first page, {hidden} hidden by Spotify, {spotify} Spotify-owned visible)";
+                }
+                if (name == "search" && r.Ok && r.Body.Obj("playlists") is { } pl)
+                {
+                    var items = pl.Arr("items").ToList();
+                    extra = $"  ({items.Count(i => i.ValueKind != JsonValueKind.Object)} of {items.Count} results are Spotify-owned playlists hidden from this app)";
                 }
                 if (name == "devices" && r.Ok) extra = "  " + string.Join(", ", r.Body.Arr("devices").Select(d => $"{d.Str("name")} [{d.Str("type")}{(d.Bool("is_active") == true ? ", active" : "")}]"));
                 Console.WriteLine($"{name,-18} {r.Describe()}{extra}");

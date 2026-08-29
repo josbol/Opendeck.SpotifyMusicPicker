@@ -151,6 +151,7 @@ public sealed class Curator : IDisposable
             var manual = MadeForYou.ParseLinks(Settings.MadeForYouLinks);
             var made = MadeForYou.Build(mine, manual, History.LearnedArt());
             made = await ResolveManualAsync(made, now, ct);
+            made = MadeForYou.Sort(made.Concat(await DiscoverMixesAsync(made, now, ct)));
 
             // 3. Most played
             var frequent = await BuildFrequentAsync(now, made.Select(i => i.Uri).ToHashSet(), ct);
@@ -217,15 +218,44 @@ public sealed class Curator : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// Playlists played from the Spotify app whose metadata Spotify refuses are its own mixes (Daily Mix, daylist…):
+    /// they belong on the made-for-you row even when nobody pasted their link, named "Spotify mix" until the user does.
+    /// </summary>
+    private async Task<List<PickItem>> DiscoverMixesAsync(IReadOnlyList<PickItem> made, DateTimeOffset now, CancellationToken ct)
+    {
+        var known = made.Select(i => i.Uri).ToHashSet();
+        var learned = History.LearnedArt();
+        var found = new List<PickItem>();
+        foreach (var s in History.RankContexts(now, Math.Max(Settings.HistoryDays, 90), Settings.HalfLifeDays))
+        {
+            if (s.Kind != ItemKind.Playlist || known.Contains(s.Uri)) continue;
+            var meta = await ResolveMetaAsync(s.Uri, ItemKind.Playlist, ct);
+            if (meta is not { Missing: true }) continue;
+            found.Add(new PickItem
+            {
+                Uri = s.Uri, Kind = ItemKind.Playlist, Name = MadeForYou.UnnamedMix, Subtitle = "Made for you",
+                ImageUrl = learned.GetValueOrDefault(s.Uri) ?? s.SampleImage, Score = s.Score, MetadataMissing = true,
+                Source = $"played from the Spotify app ({s.Plays} plays); paste its link with a name in the settings",
+            });
+        }
+        return found;
+    }
+
+    /// <summary>Two editions of the same album (deluxe, remaster) are one thing on the deck.</summary>
+    private static string EditionKey(PickItem i) => i.Kind == ItemKind.Album ? $"{i.Name}|{i.Subtitle?.Split(',')[0]}".ToLowerInvariant().Trim() : i.Uri;
+
     private async Task<List<PickItem>> BuildFrequentAsync(DateTimeOffset now, HashSet<string> exclude, CancellationToken ct)
     {
         var items = new List<PickItem>();
+        var editions = new HashSet<string>();
         var manualNames = MadeForYou.ParseLinks(Settings.MadeForYouLinks).Where(m => m.Name is not null).ToDictionary(m => m.Uri, m => m.Name!);
         foreach (var s in History.RankContexts(now, Settings.HistoryDays, Settings.HalfLifeDays))
         {
             if (exclude.Contains(s.Uri)) continue;
             var item = await ToItemAsync(s, manualNames, ct);
-            if (item is not null) items.Add(item);
+            if (item is null || !editions.Add(EditionKey(item))) continue;
+            items.Add(item);
             if (items.Count >= Settings.FrequentCount) break;
         }
         if (items.Count < 5)
@@ -237,7 +267,9 @@ public sealed class Curator : IDisposable
             {
                 if (exclude.Contains(g.Key) || items.Any(i => i.Uri == g.Key)) continue;
                 var t = g.First();
-                items.Add(new PickItem { Uri = g.Key, Kind = ItemKind.Album, Name = t.AlbumName ?? "Album", Subtitle = t.Artists, ImageUrl = t.AlbumImage, Source = $"{g.Count()} of your top tracks", Score = g.Count() });
+                var item = new PickItem { Uri = g.Key, Kind = ItemKind.Album, Name = t.AlbumName ?? "Album", Subtitle = t.Artists, ImageUrl = t.AlbumImage, Source = $"{g.Count()} of your top tracks", Score = g.Count() };
+                if (!editions.Add(EditionKey(item))) continue;
+                items.Add(item);
                 if (items.Count >= Settings.FrequentCount) break;
             }
         }
@@ -251,6 +283,12 @@ public sealed class Curator : IDisposable
         {
             case ItemKind.Collection:
                 return new PickItem { Uri = s.Uri, Kind = s.Kind, Name = "Liked Songs", Subtitle = "Your library", ImageUrl = s.SampleImage, Source = source, Score = s.Score };
+            case ItemKind.Artist:
+            {
+                var meta = await ResolveMetaAsync(s.Uri, s.Kind, ct);
+                if (meta is null or { Missing: true }) return null;
+                return new PickItem { Uri = s.Uri, Kind = s.Kind, Name = meta.Name ?? "Artist", Subtitle = "Artist", ImageUrl = meta.ImageUrl ?? s.SampleImage, Source = source, Score = s.Score };
+            }
             case ItemKind.Album:
             case ItemKind.Playlist:
             {
@@ -289,6 +327,13 @@ public sealed class Curator : IDisposable
             {
                 var f = await Client.PlaylistAsync(id, ct);
                 if (f.Value is { } p) entry = new() { Uri = uri, Kind = kind, Name = p.Name, Subtitle = MadeForYou.IsSpotifyOwned(p) ? "Made for you" : p.OwnerName is { Length: > 0 } o ? $"by {o}" : "Playlist", ImageUrl = p.ImageUrl, FetchedAt = now };
+                else if (f.Refused) refused = true; else failed = true;
+                break;
+            }
+            case ItemKind.Artist:
+            {
+                var f = await Client.ArtistAsync(id, ct);
+                if (f.Value is { } a) entry = new() { Uri = uri, Kind = kind, Name = a.Name, Subtitle = "Artist", ImageUrl = a.ImageUrl, FetchedAt = now };
                 else if (f.Refused) refused = true; else failed = true;
                 break;
             }

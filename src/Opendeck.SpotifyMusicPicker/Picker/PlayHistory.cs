@@ -51,7 +51,7 @@ public sealed class PlayHistory
     /// <summary>A track played without a context (search, queue) counts for its album.</summary>
     public static string? ContextOf(PlayEntry e) => e.ContextUri ?? e.AlbumUri;
 
-    /// <summary>Albums / playlists / Liked Songs ranked by recency-weighted plays (half-life in days).</summary>
+    /// <summary>Albums / playlists / artists / Liked Songs ranked by recency-weighted plays (half-life in days).</summary>
     public List<ContextStat> RankContexts(DateTimeOffset now, int days, double halfLifeDays)
     {
         var since = now.AddDays(-days);
@@ -63,7 +63,7 @@ public sealed class PlayHistory
                 if (e.At < since || e.At > now.AddMinutes(5)) continue;
                 var uri = ContextOf(e); if (uri is null) continue;
                 var kind = PickItem.KindOf(uri);
-                if (kind is not (ItemKind.Album or ItemKind.Playlist or ItemKind.Collection)) continue;
+                if (kind is not (ItemKind.Album or ItemKind.Playlist or ItemKind.Collection or ItemKind.Artist)) continue;
                 var w = Math.Pow(0.5, Math.Max(0, (now - e.At).TotalDays) / Math.Max(0.1, halfLifeDays));
                 acc[uri] = acc.TryGetValue(uri, out var cur) ? (cur.Score + w, cur.Plays + 1, e.At >= cur.Last.At ? e : cur.Last) : (w, 1, e);
             }

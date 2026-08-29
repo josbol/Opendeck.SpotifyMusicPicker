@@ -67,17 +67,18 @@ public class HistoryTests
             Play(now.AddDays(-40), "p1", "X", "spotify:playlist:P"), Play(now.AddDays(-40), "p2", "X", "spotify:playlist:P"), Play(now.AddDays(-40), "p3", "X", "spotify:playlist:P"),
             Play(now.AddHours(-2), "q", "Q", null),                               // no context → counts for its album
             Play(now.AddHours(-1), "l", "L", "spotify:user:me:collection"),
-            Play(now.AddHours(-1), "r", "R", "spotify:artist:Z"),                 // artist contexts are ignored
+            Play(now.AddHours(-1.5), "r", "R", "spotify:artist:Z"),               // artist contexts count too (artist radio / page)
+            Play(now.AddHours(-1), "s", "S", "spotify:show:Pod"),                  // shows do not
         }, now);
         var ranked = h.RankContexts(now, 90, 14);
-        // two plays yesterday (≈0.95 each) > one play an hour ago > one two hours ago > three plays 40 days ago (≈0.14 each)
-        Assert.Equal(new[] { "spotify:album:A", "spotify:user:me:collection", "spotify:album:Q", "spotify:playlist:P" }, ranked.Select(r => r.Uri));
+        // two plays yesterday (≈0.95 each) > one play an hour ago > 1.5 h > two hours ago > three plays 40 days ago (≈0.14 each)
+        Assert.Equal(new[] { "spotify:album:A", "spotify:user:me:collection", "spotify:artist:Z", "spotify:album:Q", "spotify:playlist:P" }, ranked.Select(r => r.Uri));
         var a = ranked[0];
         Assert.Equal(2, a.Plays); Assert.Equal("A", a.SampleName); Assert.Equal(ItemKind.Album, a.Kind);
         Assert.Equal("Liked Songs", ranked[1].SampleName);
-        Assert.Equal(3, ranked[3].Plays);
-        Assert.Null(ranked[3].SampleName);            // playlists need metadata for a name
-        Assert.Equal("http://img/X", ranked[3].SampleImage);
+        Assert.Equal(3, ranked[4].Plays);
+        Assert.Null(ranked[4].SampleName);            // playlists need metadata for a name
+        Assert.Equal("http://img/X", ranked[4].SampleImage);
         Assert.DoesNotContain(h.RankContexts(now, 30, 14), r => r.Uri == "spotify:playlist:P");   // outside the window
     }
 

@@ -21,6 +21,7 @@ public static class Scenario
         var albumB = TestData.Album("B", "Album B", "arB", "Artist B", Img("grey"));
         var albumC = TestData.Album("C", "Album C", "arC", "Artist C", Img("grey"));
         var albumD = TestData.Album("D", "Album D", "arD", "Artist D", Img("grey"));
+        var albumA2 = TestData.Album("A2", "Album A", "arA", "Artist A", Img("grey"));   // another edition of album A
         var albumE = TestData.Album("E", "Album E", "arE", "Artist E", Img("grey"));
 
         api.Json("GET", "/v1/me", new { id = "jos", display_name = "Jos" });
@@ -36,13 +37,18 @@ public static class Scenario
             TestData.Play(now.AddHours(-4), TestData.Track("t4", "Song 4", albumB, "arB", "Artist B"), "spotify:playlist:mine"),
             TestData.Play(now.AddHours(-5), TestData.Track("t5", "Song 5", albumB, "arB", "Artist B"), "spotify:playlist:mine"),
             TestData.Play(now.AddHours(-6), TestData.Track("t6", "Song 6", albumC, "arC", "Artist C"), "spotify:playlist:HID"),
+            TestData.Play(now.AddHours(-7), TestData.Track("t7", "Song 7", albumC, "arC", "Artist C"), "spotify:playlist:HID2"),   // a mix played in the app, no link pasted
+            TestData.Play(now.AddHours(-8), TestData.Track("t8", "Song 8", albumA, "arA", "Artist A"), "spotify:artist:arA"),      // artist context
         }));
+        api.Json("GET", "/v1/artists/arA", TestData.Artist("arA", "Artist A"));
+        api.Json("GET", "/v1/playlists/HID2", FakeSpotify.SpotifyError(404, "Resource not found"), 404);
         api.Json("GET", "/v1/albums/A", albumA); api.Json("GET", "/v1/albums/B", albumB); api.Json("GET", "/v1/albums/C", albumC); api.Json("GET", "/v1/albums/D", albumD); api.Json("GET", "/v1/albums/E", albumE);
         api.Json("GET", "/v1/playlists/mine", TestData.Playlist("mine", "My Jams", "jos", Img("grey")));
         api.Json("GET", "/v1/playlists/HID", FakeSpotify.SpotifyError(404, "Resource not found"), 404);
         api.Json("GET", "/v1/me/top/tracks", TestData.Paged(new object?[]
         {
             TestData.Track("d1", "D 1", albumD, "arD", "Artist D"), TestData.Track("d2", "D 2", albumD, "arD", "Artist D"), TestData.Track("d3", "D 3", albumD, "arD", "Artist D"), TestData.Track("e1", "E 1", albumE, "arE", "Artist E"),
+            TestData.Track("a9", "A 9", albumA2, "arA", "Artist A"),
         }));
         api.Json("GET", "/v1/me/albums", TestData.Paged(new object?[]
         {

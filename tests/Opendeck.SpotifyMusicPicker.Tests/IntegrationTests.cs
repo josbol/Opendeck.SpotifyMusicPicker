@@ -171,8 +171,8 @@ public class EndToEndTests
         await opendeck.WaitForAsync(m => IsSetImage(m, "Keypad.10.0") && Pixel(m, 72, 40) is { R: < 80, G: < 100, B: > 180 });
         await opendeck.WaitForAsync(m => IsSetImage(m, "Keypad.13.0") && Pixel(m, 30, 60) is { R: < 80, G: > 150, B: < 100 });
         await opendeck.WaitForAsync(m => IsSetImage(m, "Keypad.15.0"));
-        var empty = await opendeck.WaitForAsync(m => IsSetImage(m, "Keypad.4.0"));      // only 3 made-for-you items: slot 5 is empty
-        Assert.True(Pixel(empty, 72, 40) is { R: < 60, G: < 60, B: < 70 });
+        // only 4 made-for-you items: slot 5 ends up as the dark "empty" key (its first image may still be the connect placeholder)
+        await opendeck.WaitForAsync(m => IsSetImage(m, "Keypad.4.0") && Pixel(m, 72, 40) is { R: < 60, G: < 60, B: < 70 });
         Assert.DoesNotContain(opendeck.Received, m => IsSetImage(m, "Encoder.0.0"));     // dials have no display on the D200X
 
         // press Daily Mix 1 → played on the laptop after the "no active device" answer

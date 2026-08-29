@@ -244,6 +244,7 @@ public sealed class PluginHost : IAsyncDisposable
         {
             var img = a.Render(snap, now);
             if (img is null || img == a.LastImage) return;
+            if (a.LastImage is not null) Log.Debug($"re-sent {a.ActionUuid[UuidPrefix.Length..]} @ {a.Context} ({img.Length / 1024} KiB)");
             a.LastImage = img;
             lock (_lock) _sent[a.Context] = img;
             Deck.SetImage(a.Context, img);

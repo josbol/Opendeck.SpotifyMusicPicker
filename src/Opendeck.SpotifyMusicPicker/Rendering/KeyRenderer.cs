@@ -97,8 +97,14 @@ public sealed class KeyRenderer
 
     public string ConnectKey(string? error) => MessageKey("Spotify", error is null ? "connect in the key settings" : error, error is null ? Green : Warn);
 
+    /// <summary>How much detail a now-playing key shows about the position in the song. Every change repaints the
+    /// key, and on the D200X repainting the wide screen flashes the firmware's gauges, so the wide layout defaults to coarse.</summary>
+    public enum Progress { Off, Coarse, Fine }
+
+    private static int Steps(Progress progress) => progress switch { Progress.Fine => 50, Progress.Coarse => 10, _ => 0 };
+
     /// <summary>Now playing on a square key.</summary>
-    public string NowPlayingKey(PlaybackState? p, byte[]? art)
+    public string NowPlayingKey(PlaybackState? p, byte[]? art, Progress progress = Progress.Fine)
     {
         using var s = NewSurface(); var c = s.Canvas;
         if (p is null || p.TrackName is null)
@@ -113,14 +119,15 @@ public sealed class KeyRenderer
         Gradient(c, new SKRect(0, Size - 78, Size, Size), SKColors.Transparent, SKColors.Black.WithAlpha(225));
         var used = DrawWrapped(c, p.TrackName, 8, Size - 44, 13, Text, Size - 16, 2, bold: true);
         DrawFitted(c, p.Artists ?? "", 8, Size - 44 + used * 17 - 1, 10, Muted, Size - 16, SKTextAlign.Left);
-        ProgressBar(c, new SKRect(8, Size - 9, Size - 8, Size - 5), p.ProgressStep / 50f);
+        if (progress != Progress.Off) ProgressBar(c, new SKRect(8, Size - 9, Size - 8, Size - 5), p.ProgressFraction(Steps(progress)));
         Circle(c, new SKPoint(Size - 20, 20), 13, p.IsPlaying ? Green : Card);
         if (p.IsPlaying) Pause(c, new SKPoint(Size - 20, 20), 6, SKColors.Black); else Triangle(c, new SKPoint(Size - 19, 20), 7, Text);
         return Encode(s);
     }
 
-    /// <summary>Now playing for a 2:1 screen: composed at 288×144, then squeezed into the 144 square.</summary>
-    public string NowPlayingWideKey(PlaybackState? p, byte[]? art)
+    /// <summary>Now playing for a 2:1 screen: composed at 288×144, then squeezed into the 144 square.
+    /// Nothing that ticks (elapsed time, volume) is drawn: each change would repaint the screen.</summary>
+    public string NowPlayingWideKey(PlaybackState? p, byte[]? art, Progress progress = Progress.Coarse)
     {
         const int W = Size * 2;
         using var wide = SKSurface.Create(new SKImageInfo(W, Size, SKColorType.Rgba8888, SKAlphaType.Premul));
@@ -140,10 +147,9 @@ public sealed class KeyRenderer
             var y = 34 + used * 20;
             DrawFitted(c, p.Artists ?? "", x, y + 2, 12, Muted, maxW, SKTextAlign.Left);
             if (p.AlbumName is not null && used < 2) DrawFitted(c, p.AlbumName, x, y + 20, 11, Dim, maxW, SKTextAlign.Left);
-            var foot = Clock(p.ProgressMs) + " / " + Clock(p.DurationMs) + (p.VolumePercent is { } v ? $"  ·  vol {v}%" : "");
-            DrawFitted(c, foot, x, Size - 22, 10, Muted, maxW, SKTextAlign.Left);
-            if (p.DeviceName is { Length: > 0 } dev) DrawFitted(c, dev, W - 44, 26, 9, Dim, W - 44 - x - 60, SKTextAlign.Right);
-            ProgressBar(c, new SKRect(x, Size - 12, W - 10, Size - 7), p.ProgressStep / 50f);
+            var foot = string.Join("  ·  ", new[] { p.DurationMs > 0 ? Clock(p.DurationMs) : null, p.DeviceName }.Where(t => !string.IsNullOrEmpty(t)));
+            DrawFitted(c, foot, x, Size - (progress == Progress.Off ? 14 : 22), 10, Muted, maxW, SKTextAlign.Left);
+            if (progress != Progress.Off) ProgressBar(c, new SKRect(x, Size - 12, W - 10, Size - 7), p.ProgressFraction(Steps(progress)));
             Circle(c, new SKPoint(W - 24, 22), 14, p.IsPlaying ? Green : Card);
             if (p.IsPlaying) Pause(c, new SKPoint(W - 24, 22), 6, SKColors.Black); else Triangle(c, new SKPoint(W - 23, 22), 8, Text);
         }

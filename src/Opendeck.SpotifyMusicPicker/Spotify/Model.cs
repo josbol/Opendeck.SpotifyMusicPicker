@@ -67,6 +67,9 @@ public sealed record PlaybackState
     /// <summary>Progress as shown on a key (2 % steps), so the picture only changes when the bar would.</summary>
     public int ProgressStep => DurationMs <= 0 ? 0 : (int)Math.Round(50.0 * Math.Clamp(ProgressMs, 0, DurationMs) / DurationMs);
 
+    /// <summary>Progress quantised to the given number of steps (a coarse bar repaints the key less often).</summary>
+    public float ProgressFraction(int steps) => DurationMs <= 0 || steps <= 0 ? 0 : (float)Math.Floor(steps * (double)Math.Clamp(ProgressMs, 0, DurationMs) / DurationMs) / steps;
+
     public bool LooksLike(PlaybackState? o) => o is not null && o.IsPlaying == IsPlaying && o.ContextUri == ContextUri && o.TrackUri == TrackUri
         && o.VolumePercent == VolumePercent && o.DeviceId == DeviceId && o.ProgressStep == ProgressStep && o.ImageUrl == ImageUrl;
 }

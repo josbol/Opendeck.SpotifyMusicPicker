@@ -71,7 +71,9 @@ public sealed class NowPlayingAction : DeckAction
     {
         if (!s.Connected) return Host.Renderer.ConnectKey(null);
         var art = Host.Curator.Art.Peek(s.Playback?.ImageUrl);
-        return SettingString("layout", "square") == "wide" ? Host.Renderer.NowPlayingWideKey(s.Playback, art) : Host.Renderer.NowPlayingKey(s.Playback, art);
+        var wide = SettingString("layout", "square") == "wide";
+        var progress = SettingString("progress", wide ? "coarse" : "fine") switch { "off" => Rendering.KeyRenderer.Progress.Off, "fine" => Rendering.KeyRenderer.Progress.Fine, _ => Rendering.KeyRenderer.Progress.Coarse };
+        return wide ? Host.Renderer.NowPlayingWideKey(s.Playback, art, progress) : Host.Renderer.NowPlayingKey(s.Playback, art, progress);
     }
 
     public override async Task OnKeyUpAsync(DeckEvent e) => Feedback(await Host.Curator.PlayPauseAsync(CancellationToken.None));

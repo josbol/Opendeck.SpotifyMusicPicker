@@ -195,11 +195,12 @@ public sealed class Curator : IDisposable
         try
         {
             _playedLately = History.UrisPlayedSince(now.AddDays(-Settings.ExcludePlayedDays));
-            var frequent = await BuildFrequentAsync(now, Current.MadeForYou.Select(i => i.Uri).ToHashSet(), ct);
-            var rec = Current.Recommended.Any(r => _playedLately.Contains(r.Uri)) ? PickRecommended(now, Current.MadeForYou, frequent) : Current.Recommended;
+            var made = MadeForYou.Sort(Current.MadeForYou.Concat(await DiscoverMixesAsync(Current.MadeForYou, now, ct)));   // a mix just played in the app
+            var frequent = await BuildFrequentAsync(now, made.Select(i => i.Uri).ToHashSet(), ct);
+            var rec = Current.Recommended.Any(r => _playedLately.Contains(r.Uri)) ? PickRecommended(now, made, frequent) : Current.Recommended;
             Meta.Save();
-            await PrefetchArtAsync(frequent.Concat(rec), ct);
-            Publish(Current with { Frequent = frequent, Recommended = rec, HistoryPlays = History.Count, At = now });
+            await PrefetchArtAsync(made.Concat(frequent).Concat(rec), ct);
+            Publish(Current with { MadeForYou = made, Frequent = frequent, Recommended = rec, HistoryPlays = History.Count, At = now });
         }
         finally { _listsGate.Release(); }
     }
@@ -258,9 +259,9 @@ public sealed class Curator : IDisposable
             items.Add(item);
             if (items.Count >= Settings.FrequentCount) break;
         }
-        if (items.Count < 5)
+        if (items.Count < Settings.FrequentCount)
         {
-            // cold start: the albums your top tracks come from
+            // fill up (and cold-start) with the albums your top tracks come from
             var top = await Client.TopTracksAsync("short_term", 50, ct);
             if (top.Count == 0) top = await Client.TopTracksAsync("medium_term", 50, ct);
             foreach (var g in top.Where(t => t.AlbumUri is not null).GroupBy(t => t.AlbumUri!).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal))

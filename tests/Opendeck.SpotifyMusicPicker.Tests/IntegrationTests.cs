@@ -97,6 +97,22 @@ public class CuratorIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task LikesAndUnlikesTheCurrentTrack()
+    {
+        await _curator.RefreshPlaybackAsync(CancellationToken.None);
+        Assert.False(_curator.Current.Playback!.Liked);
+        Assert.True(await _curator.ToggleLikeAsync(CancellationToken.None));
+        Assert.True(_curator.Current.Playback!.Liked);
+        Assert.Contains("uris=spotify%3Atrack%3At1", _api.Requests.Last(r => r.Method == "PUT" && r.Path == "/v1/me/library").Query);
+        await _curator.RefreshPlaybackAsync(CancellationToken.None);                   // same track: no new contains call
+        Assert.Equal(1, _api.Count("GET", "/v1/me/library/contains"));
+        Assert.True(await _curator.ToggleLikeAsync(CancellationToken.None));
+        Assert.False(_curator.Current.Playback!.Liked);
+        Assert.Equal(1, _api.Count("DELETE", "/v1/me/library"));
+        Assert.True(_curator.Auth.HasScope("user-library-modify"));
+    }
+
+    [Fact]
     public async Task RefusedTokenMeansNotConnected()
     {
         _api.Json("GET", "/v1/me/playlists", FakeSpotify.SpotifyError(401, "The access token expired"), 401);

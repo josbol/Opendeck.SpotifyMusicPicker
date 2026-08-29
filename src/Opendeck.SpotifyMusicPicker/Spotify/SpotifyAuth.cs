@@ -24,7 +24,7 @@ public sealed record LoginResult(bool Ok, string? UserName, string? Error);
 /// </summary>
 public sealed class SpotifyAuth
 {
-    public const string Scopes = "user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-recently-played user-top-read user-library-read user-follow-read playlist-read-private playlist-read-collaborative user-read-private";
+    public const string Scopes = "user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-recently-played user-top-read user-library-read user-library-modify user-follow-read playlist-read-private playlist-read-collaborative user-read-private";
 
     public string AccountsUrl { get; set; } = "https://accounts.spotify.com";
     public string ApiUrl { get; set; } = "https://api.spotify.com/v1";
@@ -49,6 +49,8 @@ public sealed class SpotifyAuth
     public string? UserName => _tokens?.UserName;
     public string? ClientId => _tokens?.ClientId;
     public string? Scope => _tokens?.Scope;
+    /// <summary>Whether the stored consent covers a scope (a scope added in a later version needs a fresh login).</summary>
+    public bool HasScope(string scope) => (_tokens?.Scope ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains(scope);
 
     // ---- token file -----------------------------------------------------------------------
 

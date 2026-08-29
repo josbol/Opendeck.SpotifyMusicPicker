@@ -106,6 +106,7 @@ public sealed class PluginHost : IAsyncDisposable
         return new
         {
             connected = Curator.Auth.IsConnected, user = Curator.Auth.UserName, error = notice ?? Curator.Auth.Error,
+            missingScopes = SpotifyAuth.Scopes.Split(' ').Where(sc => Curator.Auth.IsConnected && !Curator.Auth.HasScope(sc)).ToArray(),
             authorizeUrl = Curator.Auth.PendingAuthorizeUrl, clientIdSource = source, clientIdPreview = id.Length > 6 ? id[..6] + "…" : id,
             redirectUri = $"http://127.0.0.1:{Settings.RedirectPort}/callback",
             lists = Curator.Describe(),
@@ -211,6 +212,7 @@ public sealed class PluginHost : IAsyncDisposable
             "nowplaying" => new NowPlayingAction { Context = context, ActionUuid = uuid, Host = this },
             "previous" => new TransportAction { Context = context, ActionUuid = uuid, Host = this, Next = false },
             "next" => new TransportAction { Context = context, ActionUuid = uuid, Host = this, Next = true },
+            "like" => new LikeAction { Context = context, ActionUuid = uuid, Host = this },
             "volumedial" => new VolumeDialAction { Context = context, ActionUuid = uuid, Host = this },
             "browsedial" => new BrowseDialAction { Context = context, ActionUuid = uuid, Host = this },
             _ => null,

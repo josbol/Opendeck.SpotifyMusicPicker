@@ -73,9 +73,17 @@ def browse():
     d.polygon([(222, 144), (202, 128), (202, 160)], fill=WHITE)
     return img
 
+def like():
+    img, d = canvas()
+    cx, cy, r = 144, 128, 52
+    d.ellipse((cx - 2 * r, cy - r - 20, cx, cy + r - 20), fill=GREEN)
+    d.ellipse((cx, cy - r - 20, cx + 2 * r, cy + r - 20), fill=GREEN)
+    d.polygon([(cx - 2 * r + 6, cy + 4), (cx + 2 * r - 6, cy + 4), (cx, cy + 110)], fill=GREEN)
+    return img
+
 def main():
     os.makedirs(OUT, exist_ok=True)
-    icons = {"plugin": plugin(), "slot": slot(), "nowplaying": nowplaying(), "previous": transport(False), "next": transport(True), "dial": dial(), "browse": browse()}
+    icons = {"plugin": plugin(), "slot": slot(), "nowplaying": nowplaying(), "previous": transport(False), "next": transport(True), "dial": dial(), "browse": browse(), "like": like()}
     for name, img in icons.items():
         img.save(os.path.join(OUT, f"{name}@2x.png"), optimize=True)
         img.resize((144, 144), Image.Resampling.LANCZOS).save(os.path.join(OUT, f"{name}.png"), optimize=True)

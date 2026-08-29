@@ -121,6 +121,10 @@ if (args.Length > 0 && args[0].StartsWith("--"))
             Save("nowplaying-none", r.NowPlayingKey(null, null));
             Save("nowplaying-wide", r.NowPlayingWideKey(pb, art));
             Save("nowplaying-wide-none", r.NowPlayingWideKey(null, null));
+            Save("like-liked", r.LikeKey(pb with { Liked = true }, art, true));
+            Save("like-not", r.LikeKey(pb with { Liked = false }, art, true));
+            Save("like-noscope", r.LikeKey(pb with { Liked = false }, art, false));
+            Save("like-none", r.LikeKey(null, null, true));
             Save("previous", r.TransportKey(false));
             Save("next", r.TransportKey(true));
             Console.WriteLine($"wrote {Directory.GetFiles(dir).Length} images to {dir}");

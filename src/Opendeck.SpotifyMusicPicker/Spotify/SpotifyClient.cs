@@ -164,6 +164,18 @@ public sealed class SpotifyClient
         return r.Ok && r.Body.Obj("artists") is { } a ? a.Arr("items").Select(ParseArtist).OfType<ArtistInfo>().ToList() : new();
     }
 
+    /// <summary>Whether the user saved (liked / followed) the item; null when Spotify cannot tell.</summary>
+    public async Task<bool?> LibraryContainsAsync(string uri, CancellationToken ct)
+    {
+        var r = await GetAsync($"/me/library/contains?uris={Uri.EscapeDataString(uri)}", ct);
+        if (!r.Ok || r.Body.ValueKind != JsonValueKind.Array) return null;
+        foreach (var v in r.Body.EnumerateArray()) return v.ValueKind switch { JsonValueKind.True => true, JsonValueKind.False => false, _ => null };
+        return null;
+    }
+
+    public Task<ApiResponse> SaveToLibraryAsync(string uri, CancellationToken ct) => SendAsync(HttpMethod.Put, $"/me/library?uris={Uri.EscapeDataString(uri)}", null, ct);
+    public Task<ApiResponse> RemoveFromLibraryAsync(string uri, CancellationToken ct) => SendAsync(HttpMethod.Delete, $"/me/library?uris={Uri.EscapeDataString(uri)}", null, ct);
+
     public async Task<(string? Id, string? Name)> MeAsync(CancellationToken ct)
     {
         var r = await GetAsync("/me", ct);

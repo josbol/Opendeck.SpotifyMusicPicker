@@ -79,6 +79,18 @@ public sealed class NowPlayingAction : DeckAction
     public override async Task OnKeyUpAsync(DeckEvent e) => Feedback(await Host.Curator.PlayPauseAsync(CancellationToken.None));
 }
 
+/// <summary>Like / unlike the current track (Liked Songs). Filled heart = liked. Needs a consent that includes user-library-modify.</summary>
+public sealed class LikeAction : DeckAction
+{
+    public override string? Render(Snapshot s, DateTimeOffset now)
+    {
+        if (!s.Connected) return Host.Renderer.ConnectKey(null);
+        return Host.Renderer.LikeKey(s.Playback, Host.Curator.Art.Peek(s.Playback?.ImageUrl), Host.Curator.Auth.HasScope("user-library-modify"));
+    }
+
+    public override async Task OnKeyUpAsync(DeckEvent e) => Feedback(await Host.Curator.ToggleLikeAsync(CancellationToken.None));
+}
+
 /// <summary>Previous / next track (whole song). Meant for the side buttons; draws a glyph if placed on a display key.</summary>
 public sealed class TransportAction : DeckAction
 {

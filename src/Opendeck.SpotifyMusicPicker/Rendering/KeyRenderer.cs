@@ -159,6 +159,25 @@ public sealed class KeyRenderer
         return Encode(s, photo: art is not null);
     }
 
+    /// <summary>Like / unlike the current track: a heart, filled when the track is in Liked Songs, over the dimmed cover.</summary>
+    public string LikeKey(PlaybackState? p, byte[]? art, bool canModify)
+    {
+        using var s = NewSurface(); var c = s.Canvas;
+        var haveTrack = p?.TrackUri is not null;
+        if (haveTrack && DrawArt(c, art, new SKRect(0, 0, Size, Size))) Fill(c, new SKRect(0, 0, Size, Size), SKColors.Black.WithAlpha(150));
+        var liked = p?.Liked == true;
+        var heart = liked ? "♥" : "♡";
+        var color = !haveTrack ? Dim : liked ? Green : Text;
+        DrawText(c, heart, Size / 2f, 88, 74, color, bold: true, align: SKTextAlign.Center);
+        string label;
+        if (!haveTrack) label = "nothing playing";
+        else if (!canModify) label = "connect again to allow saving";
+        else label = liked ? "Liked · press to remove" : "press to like";
+        DrawFitted(c, label, Size / 2f, 124, 10, haveTrack ? Muted : Dim, Size - 12, SKTextAlign.Center);
+        if (haveTrack) DrawFitted(c, p!.TrackName ?? "", Size / 2f, 18, 10, Muted, Size - 12, SKTextAlign.Center);
+        return Encode(s, photo: haveTrack && art is not null);
+    }
+
     /// <summary>Previous / next track glyphs (for when the transport actions sit on keys with a display).</summary>
     public string TransportKey(bool next)
     {

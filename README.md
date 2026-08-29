@@ -12,6 +12,8 @@ the Ulanzi D200X (5×3 keys, a double-width screen, two side buttons, three dial
   catalogues of your top and followed artists — new picks every day, or on a dial press.
 - **Wide screen — Now playing**: cover, track, artist, progress, volume; press = play / pause. Square keys get a
   square version.
+- **Like key**: saves the playing song to Liked Songs or removes it (filled heart = liked), like the one in *Essentials
+  for Spotify*.
 - **Side buttons**: previous / next song.
 - **Left dial**: Spotify volume; **press = switch between your main layout and the Spotify layout** (and back).
   The right dial is whatever you already have there (the profile generator copies it from your main layout).
@@ -36,6 +38,7 @@ Spotify's API rules changed twice (November 2024, February 2026) and this plugin
 | Most played | `GET /me/player/recently-played` polled every few minutes into a local history (`~/.local/share/opendeck-spotifymusicpicker/history.json`); `GET /me/top/tracks` while the history is short |
 | Suggested | `GET /me/albums` (saved albums not played lately), `GET /me/top/artists` + `GET /me/following` → `GET /artists/{id}/albums`; `/recommendations`, `/browse/new-releases` and `related-artists` are gone |
 | Now playing / transport / volume | the player endpoints (`/me/player…`), `playerctl -p spotify` as fallback |
+| Like | `GET /me/library/contains?uris=`, `PUT` / `DELETE /me/library?uris=` (the old `/me/tracks…` endpoints are gone); needs the `user-library-modify` scope — a version that adds a scope asks you to press *Connect to Spotify* once more |
 | Covers | `GET /albums/{id}`, `GET /playlists/{id}` (batch endpoints were removed, so results are cached on disk) |
 | Layout switch (dial press) | plugins may not send `switchProfile` over the socket, so the message is handed to the running OpenDeck through its single-instance D-Bus hook (`busctl … org.SingleInstance.DBus ExecuteCallback`, a few ms); `opendeck --process-message` (~300 ms) is the fallback |
 
@@ -77,7 +80,7 @@ you install as a symlink.
 ```
  row 0 │ Made for you 1 │ 2 │ 3 │ 4 │ 5
  row 1 │ Most played 1  │ 2 │ 3 │ 4 │ 5
- row 2 │ Suggested 1 │ 2 │ 3 │ Now playing (wide screen) │ D200X "Wide screen" action (copied from Default)
+ row 2 │ Suggested 1 │ 2 │ Like / unlike │ Now playing (wide screen) │ D200X "Wide screen" action (copied from Default)
  dials │ 0: Spotify volume, press → back to Default │ 1: copied from Default (e.g. PipeWire volume) │ 2: browse / new suggestions
  side  │ 1: previous track │ 2: next track
 ```
@@ -112,7 +115,7 @@ Plugin log: `~/.local/share/opendeck/logs/plugins/com.josbol.spotifymusicpicker.
 
 ## Settings
 
-Per key: row (Made for you / Most played / Suggested) and slot; now-playing layout (square / wide); dial press target
+Per key: row (Made for you / Most played / Suggested) and slot; now-playing layout (square / wide) and progress bar; dial press target
 (Spotify layout / main layout / play-pause) and volume step; browse dial rows.
 
 Plugin-wide (any property inspector → *Plugin-wide settings*): client id and callback port, the two profile names,

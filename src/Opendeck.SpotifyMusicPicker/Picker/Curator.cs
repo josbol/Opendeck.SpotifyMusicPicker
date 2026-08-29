@@ -49,6 +49,8 @@ public sealed class Curator : IDisposable
     private int _reroll, _madeOffset, _freqOffset;
     private int _pendingVolume = -1;
     private int _volumeSending;
+    private string? _likedTrack;   // the track _liked is known for
+    private bool? _liked;
 
     public Curator(SpotifyClient client, SpotifyAuth auth, PlayHistory history, MetadataCache meta, ArtCache art, OEmbedClient oembed)
     {
@@ -410,6 +412,11 @@ public sealed class Curator : IDisposable
         var (state, r) = await Client.PlayerAsync(now, ct);
         if (r.Status is not (200 or 204)) { Log.Debug($"player: {r.Describe()}"); return; }
         if (state?.ImageUrl is { } url) await Art.GetAsync(url, ct);
+        if (state?.TrackUri is { } track)
+        {
+            if (track != _likedTrack) { _liked = PickItem.KindOf(track) == ItemKind.Track ? await Client.LibraryContainsAsync(track, ct) : null; _likedTrack = track; }
+            state = state with { Liked = _liked };
+        }
         var changed = state is null ? Current.Playback is not null : !state.LooksLike(Current.Playback);
         Publish(Current with { Playback = state, At = now }, notify: changed);
     }
@@ -477,6 +484,20 @@ public sealed class Curator : IDisposable
         return ok;
     }
 
+    /// <summary>Saves the current track to Liked Songs, or removes it. Needs the user-library-modify scope.</summary>
+    public async Task<bool> ToggleLikeAsync(CancellationToken ct)
+    {
+        if (Current.Playback?.TrackUri is not { } track || PickItem.KindOf(track) != ItemKind.Track) return false;
+        if (!Auth.HasScope("user-library-modify")) { Log.Warn("Like: the stored consent lacks user-library-modify; connect again in the settings"); return false; }
+        var liked = Current.Playback.Liked ?? (await Client.LibraryContainsAsync(track, ct) ?? false);
+        var r = liked ? await Client.RemoveFromLibraryAsync(track, ct) : await Client.SaveToLibraryAsync(track, ct);
+        if (!r.Ok) { Log.Warn($"{(liked ? "unlike" : "like")} {track}: {r.Describe()}"); return false; }
+        _likedTrack = track; _liked = !liked;
+        if (Current.Playback is { } p && p.TrackUri == track) Publish(Current with { Playback = p with { Liked = !liked }, At = DateTimeOffset.UtcNow });
+        Log.Info($"{(liked ? "Removed from" : "Saved to")} Liked Songs: {Current.Playback?.TrackName ?? track}");
+        return true;
+    }
+
     /// <summary>Volume by a relative step; sends are coalesced so a quick spin is one request.</summary>
     public void VolumeDelta(int delta)
     {
@@ -513,7 +534,8 @@ public sealed class Curator : IDisposable
         madeForYou = Current.MadeForYou.Select(i => new { i.Name, i.Uri, i.Source, missing = i.MetadataMissing }),
         frequent = Current.Frequent.Select(i => new { i.Name, i.Subtitle, i.Uri, i.Source }),
         recommended = Current.Recommended.Select(i => new { i.Name, i.Subtitle, i.Uri, i.Source }),
-        playback = Current.Playback is { } p ? new { p.TrackName, p.Artists, p.IsPlaying, p.DeviceName, p.VolumePercent, p.ContextUri } : null,
+        playback = Current.Playback is { } p ? new { p.TrackName, p.Artists, p.IsPlaying, p.DeviceName, p.VolumePercent, p.ContextUri, p.Liked } : null,
+        canLike = Auth.HasScope("user-library-modify"),
         requests = Client.Requests,
     };
 

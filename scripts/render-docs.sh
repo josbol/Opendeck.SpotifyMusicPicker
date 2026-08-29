@@ -11,7 +11,7 @@ import sys, os
 from PIL import Image
 src, out = sys.argv[1], sys.argv[2]
 order = ["mix-art", "album-art-playing", "album-art-paused", "album-tile", "liked-tile", "manual-tile",
-         "nowplaying", "nowplaying-none", "empty", "connect", "previous", "next"]
+         "nowplaying", "nowplaying-none", "like-liked", "like-not", "empty", "connect", "previous", "next"]
 files = [os.path.join(src, n + ".png") for n in order if os.path.exists(os.path.join(src, n + ".png"))]
 cols = 6; cell = 150; rows = (len(files) + cols - 1) // cols
 wide = os.path.join(src, "nowplaying-wide.png")

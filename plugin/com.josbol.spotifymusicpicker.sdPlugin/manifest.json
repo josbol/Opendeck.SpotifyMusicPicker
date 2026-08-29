@@ -94,6 +94,23 @@
 			]
 		},
 		{
+			"UUID": "com.josbol.spotifymusicpicker.like",
+			"Name": "Like / unlike",
+			"Tooltip": "Saves the current track to Liked Songs, or removes it. The heart is filled while the track is liked.",
+			"Icon": "icons/like",
+			"Controllers": [
+				"Keypad"
+			],
+			"SupportedInMultiActions": true,
+			"PropertyInspectorPath": "pi/like.html",
+			"States": [
+				{
+					"Image": "icons/like",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
 			"UUID": "com.josbol.spotifymusicpicker.volumedial",
 			"Name": "Spotify volume + layout switch",
 			"Tooltip": "Rotate: Spotify volume. Press: switch between the main layout and the Spotify layout.",

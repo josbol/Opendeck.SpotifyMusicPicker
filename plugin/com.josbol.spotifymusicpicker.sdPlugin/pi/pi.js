@@ -103,6 +103,7 @@ function renderGlobal() {
   if (auth) {
     let html = status.connected ? `<span class="ok">Connected</span> as ${esc(status.user || "?")}` : `<span class="bad">Not connected</span>`;
     if (status.error) html += ` — <span class="bad">${esc(status.error)}</span>`;
+    if (status.missingScopes && status.missingScopes.length) html += `<br><span class="bad">This plugin version needs more permissions (${esc(status.missingScopes.join(", "))}): press Connect to Spotify again.</span>`;
     if (status.authorizeUrl) html += `<br>If no browser opened: <a href="${status.authorizeUrl}" target="_blank">open the Spotify login</a>`;
     auth.innerHTML = html;
   }

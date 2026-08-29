@@ -11,7 +11,7 @@ dial on the main profile.
 Layout (5×3 grid, D200X):
   row 0 │ Made for you 1–5
   row 1 │ Most played 1–5
-  row 2 │ Suggested 1–3 │ Now playing (wide screen) │ D200X wide-screen setting (copied from the main profile)
+  row 2 │ Suggested 1–2 │ Like / unlike │ Now playing (wide screen) │ D200X wide-screen setting (copied from the main profile)
   dials │ 0: Spotify volume, press = back to the main layout │ 1: copied from the main profile │ 2: browse dial
   side  │ 1: previous track │ 2: next track
 
@@ -85,15 +85,20 @@ def retarget(inst, controller, position, settings=None):
         inst["settings"] = settings
     return inst
 
-def build_profile(manifest, main_profile, name, wide_mode, wide_fit):
+def build_profile(manifest, main_profile, name, wide_mode, wide_fit, like_key=12):
     keys = [None] * 17   # 5x3 grid (0-14) + 2 touchpoints (15, 16)
     sliders = [None] * 3
     for pos in range(0, 5):
         keys[pos] = instance(manifest, "slot", "Keypad", pos, {"row": "madeforyou", "slot": pos + 1})
     for pos in range(5, 10):
         keys[pos] = instance(manifest, "slot", "Keypad", pos, {"row": "frequent", "slot": pos - 4})
+    slot = 1
     for pos in range(10, 13):
-        keys[pos] = instance(manifest, "slot", "Keypad", pos, {"row": "recommended", "slot": pos - 9})
+        if pos == like_key:
+            keys[pos] = instance(manifest, "like", "Keypad", pos)
+        else:
+            keys[pos] = instance(manifest, "slot", "Keypad", pos, {"row": "recommended", "slot": slot})
+            slot += 1
     keys[13] = instance(manifest, "nowplaying", "Keypad", 13, {"layout": "wide"})
     main_keys = (main_profile or {}).get("keys", [None] * 17)
     wide = next((k for k in main_keys if k and k["action"]["uuid"] == WIDE_ACTION), None)
@@ -123,6 +128,7 @@ def main():
     ap.add_argument("--main-dial", type=int, default=None, help="replace this dial of the main profile with the Spotify volume dial (press → Spotify layout); needs an OpenDeck restart")
     ap.add_argument("--wide-mode", default="icon", choices=["", "clock", "stats", "icon", "off"], help="wide-screen mode for this layout (D200X plugin ≥ 1.3; '' = leave the global setting)")
     ap.add_argument("--wide-fit", default="stretch", choices=["", "letterbox", "stretch"], help="how the D200X shows the wide image ('stretch' for the plugin's 2:1 now-playing image)")
+    ap.add_argument("--like-key", type=int, default=12, help="key (10-12) for the Like / unlike button, -1 for none (three suggestions instead)")
     args = ap.parse_args()
 
     cfg = config_dir(args.config)
@@ -136,7 +142,7 @@ def main():
     if os.path.exists(out):
         shutil.copy(out, out + f".bak-{int(time.time())}")
     with open(out, "w") as f:
-        json.dump(build_profile(manifest, main_profile, args.name, args.wide_mode, args.wide_fit), f, indent=2)
+        json.dump(build_profile(manifest, main_profile, args.name, args.wide_mode, args.wide_fit, args.like_key), f, indent=2)
     print(f"wrote {out}")
 
     if args.main_dial is not None and main_profile is not None:

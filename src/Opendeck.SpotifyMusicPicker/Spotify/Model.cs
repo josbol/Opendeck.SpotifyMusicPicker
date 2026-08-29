@@ -62,6 +62,8 @@ public sealed record PlaybackState
     public string? DeviceId { get; init; }
     public string? DeviceName { get; init; }
     public bool Shuffle { get; init; }
+    /// <summary>The current track is in the user's library (Liked Songs); null while unknown.</summary>
+    public bool? Liked { get; init; }
     public DateTimeOffset At { get; init; }
 
     /// <summary>Progress as shown on a key (2 % steps), so the picture only changes when the bar would.</summary>
@@ -71,7 +73,7 @@ public sealed record PlaybackState
     public float ProgressFraction(int steps) => DurationMs <= 0 || steps <= 0 ? 0 : (float)Math.Floor(steps * (double)Math.Clamp(ProgressMs, 0, DurationMs) / DurationMs) / steps;
 
     public bool LooksLike(PlaybackState? o) => o is not null && o.IsPlaying == IsPlaying && o.ContextUri == ContextUri && o.TrackUri == TrackUri
-        && o.VolumePercent == VolumePercent && o.DeviceId == DeviceId && o.ProgressStep == ProgressStep && o.ImageUrl == ImageUrl;
+        && o.VolumePercent == VolumePercent && o.DeviceId == DeviceId && o.ProgressStep == ProgressStep && o.ImageUrl == ImageUrl && o.Liked == Liked;
 }
 
 /// <summary>Everything the keys are rendered from. Replaced as a whole on every change.</summary>

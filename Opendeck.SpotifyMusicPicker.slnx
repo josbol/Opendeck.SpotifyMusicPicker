@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Opendeck.SpotifyMusicPicker/Opendeck.SpotifyMusicPicker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Opendeck.SpotifyMusicPicker.Tests/Opendeck.SpotifyMusicPicker.Tests.csproj" />
+  </Folder>
+</Solution>

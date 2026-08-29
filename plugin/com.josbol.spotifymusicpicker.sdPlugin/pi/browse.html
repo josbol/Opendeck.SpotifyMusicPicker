@@ -1,0 +1,6 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="pi.css"><script src="pi.js"></script></head><body>
+<div class="row"><label for="row">Rotate scrolls</label><select id="row"><option value="both">Made for you + most played</option><option value="madeforyou">Made for you only</option><option value="frequent">Most played only</option></select></div>
+<div class="hint">Rows hold more items than there are keys; rotating shifts them one slot at a time. Pressing picks three new suggested albums.</div>
+<details><summary>Plugin-wide settings</summary><div id="global"></div></details>
+<script>window.bindFields = () => { bind("row", "row", { def: "both" }); };</script>
+</body></html>

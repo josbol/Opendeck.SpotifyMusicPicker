@@ -1,0 +1,8 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="pi.css"><script src="pi.js"></script></head><body>
+<div class="row"><label for="mode">Press switches to</label><select id="mode"><option value="picker">the Spotify layout (put this on the main layout)</option><option value="main">the main layout (put this on the Spotify layout)</option><option value="none">nothing — press = play / pause</option></select></div>
+<div class="row"><label for="profile">Profile override</label><input type="text" id="profile" placeholder="(from plugin-wide settings)"></div>
+<div class="row"><label for="step">Volume step (%)</label><input type="number" id="step" min="1" max="50" placeholder="(plugin-wide)"></div>
+<div class="hint">Rotating changes the Spotify volume on the active device (MPRIS fallback for the local client). Profiles are switched through the OpenDeck CLI.</div>
+<details><summary>Plugin-wide settings</summary><div id="global"></div></details>
+<script>window.bindFields = () => { bind("mode", "mode", { def: "picker" }); bind("profile", "profile", {}); bind("step", "step", { num: true }); };</script>
+</body></html>

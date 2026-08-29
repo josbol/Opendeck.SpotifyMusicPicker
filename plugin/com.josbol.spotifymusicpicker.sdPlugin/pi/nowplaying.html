@@ -1,0 +1,6 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="pi.css"><script src="pi.js"></script></head><body>
+<div class="row"><label for="layout">Layout</label><select id="layout"><option value="square">Square key</option><option value="wide">Wide (2:1) screen — D200X double screen</option></select></div>
+<div class="hint">Wide composes the image at 2:1 and squeezes it into the square OpenDeck sends; the Ulanzi D200X plugin's "Wide screen" action must be set to <em>Action icon</em> with fit <em>Stretch</em> on this layout to expand it again. Press = play / pause.</div>
+<details><summary>Plugin-wide settings</summary><div id="global"></div></details>
+<script>window.bindFields = () => { bind("layout", "layout", { def: "square" }); };</script>
+</body></html>

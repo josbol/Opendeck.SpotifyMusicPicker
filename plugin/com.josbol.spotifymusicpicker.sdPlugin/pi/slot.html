@@ -1,0 +1,7 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="pi.css"><script src="pi.js"></script></head><body>
+<div class="row"><label for="row">Row</label><select id="row"><option value="madeforyou">Made for you (Daily Mix, Discover Weekly…)</option><option value="frequent">Most played albums &amp; playlists</option><option value="recommended">Suggested albums</option></select></div>
+<div class="row"><label for="slot">Slot</label><input type="number" id="slot" min="1" max="20"></div>
+<div class="hint">Slot 1 is the first item of the row. Press the key to play it; a green frame marks what is playing now. The Browse dial scrolls the first two rows.</div>
+<details open><summary>Plugin-wide settings</summary><div id="global"></div></details>
+<script>window.bindFields = () => { bind("row", "row", { def: "madeforyou" }); bind("slot", "slot", { num: true, def: 1 }); };</script>
+</body></html>

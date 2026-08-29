@@ -1,0 +1,11 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+.idea/
+plugin/*/bin/
+render-out/
+*.user
+dist/
+__pycache__/

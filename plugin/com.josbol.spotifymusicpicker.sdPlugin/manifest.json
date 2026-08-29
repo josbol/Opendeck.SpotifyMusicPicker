@@ -1,0 +1,145 @@
+{
+	"Name": "Spotify Music Picker",
+	"Description": "A whole-deck Spotify layout: your Made-for-you playlists, the albums and playlists you play most, three album suggestions, now playing on the wide screen, previous/next on the side buttons, and a volume dial that switches layouts.",
+	"Author": "Jos Bol",
+	"Version": "0.1.0",
+	"Icon": "icons/plugin",
+	"Category": "Spotify Music Picker",
+	"CategoryIcon": "icons/plugin",
+	"URL": "https://github.com/josbol/Opendeck.SpotifyMusicPicker",
+	"CodePath": "bin/linux-x64/opendeck-spotifymusicpicker",
+	"CodePathLin": "bin/linux-x64/opendeck-spotifymusicpicker",
+	"CodePaths": {
+		"x86_64-unknown-linux-gnu": "bin/linux-x64/opendeck-spotifymusicpicker",
+		"aarch64-unknown-linux-gnu": "bin/linux-arm64/opendeck-spotifymusicpicker"
+	},
+	"OS": [
+		{
+			"Platform": "linux",
+			"MinimumVersion": "0"
+		}
+	],
+	"SDKVersion": 2,
+	"Software": {
+		"MinimumVersion": "6.0"
+	},
+	"Actions": [
+		{
+			"UUID": "com.josbol.spotifymusicpicker.slot",
+			"Name": "Picker slot",
+			"Tooltip": "One album or playlist from a row (Made for you / most played / suggested albums), with its cover. Press to play it.",
+			"Icon": "icons/slot",
+			"Controllers": [
+				"Keypad"
+			],
+			"SupportedInMultiActions": false,
+			"PropertyInspectorPath": "pi/slot.html",
+			"States": [
+				{
+					"Image": "icons/slot",
+					"ShowTitle": false,
+					"TitleAlignment": "bottom"
+				}
+			]
+		},
+		{
+			"UUID": "com.josbol.spotifymusicpicker.nowplaying",
+			"Name": "Now playing",
+			"Tooltip": "Cover, track, artist and progress of what is playing. Press to play / pause. Has a wide layout for the D200X double screen.",
+			"Icon": "icons/nowplaying",
+			"Controllers": [
+				"Keypad"
+			],
+			"SupportedInMultiActions": false,
+			"PropertyInspectorPath": "pi/nowplaying.html",
+			"States": [
+				{
+					"Image": "icons/nowplaying",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"UUID": "com.josbol.spotifymusicpicker.previous",
+			"Name": "Previous track",
+			"Tooltip": "Skips back a whole song. Made for the display-less side buttons.",
+			"Icon": "icons/previous",
+			"Controllers": [
+				"Keypad"
+			],
+			"SupportedInMultiActions": true,
+			"PropertyInspectorPath": "pi/transport.html",
+			"States": [
+				{
+					"Image": "icons/previous",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"UUID": "com.josbol.spotifymusicpicker.next",
+			"Name": "Next track",
+			"Tooltip": "Skips to the next song. Made for the display-less side buttons.",
+			"Icon": "icons/next",
+			"Controllers": [
+				"Keypad"
+			],
+			"SupportedInMultiActions": true,
+			"PropertyInspectorPath": "pi/transport.html",
+			"States": [
+				{
+					"Image": "icons/next",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"UUID": "com.josbol.spotifymusicpicker.volumedial",
+			"Name": "Spotify volume + layout switch",
+			"Tooltip": "Rotate: Spotify volume. Press: switch between the main layout and the Spotify layout.",
+			"Icon": "icons/dial",
+			"Controllers": [
+				"Encoder",
+				"Keypad"
+			],
+			"Encoder": {
+				"TriggerDescription": {
+					"Rotate": "Spotify volume",
+					"Push": "Switch layout"
+				}
+			},
+			"SupportedInMultiActions": false,
+			"PropertyInspectorPath": "pi/dial.html",
+			"States": [
+				{
+					"Image": "icons/dial",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"UUID": "com.josbol.spotifymusicpicker.browsedial",
+			"Name": "Browse dial",
+			"Tooltip": "Rotate: scroll the Made-for-you / most-played rows. Press: three new album suggestions.",
+			"Icon": "icons/browse",
+			"Controllers": [
+				"Encoder",
+				"Keypad"
+			],
+			"Encoder": {
+				"TriggerDescription": {
+					"Rotate": "Scroll rows",
+					"Push": "New suggestions"
+				}
+			},
+			"SupportedInMultiActions": false,
+			"PropertyInspectorPath": "pi/browse.html",
+			"States": [
+				{
+					"Image": "icons/browse",
+					"ShowTitle": false
+				}
+			]
+		}
+	]
+}

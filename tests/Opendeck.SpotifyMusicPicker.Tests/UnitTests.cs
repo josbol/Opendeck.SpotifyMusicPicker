@@ -112,7 +112,7 @@ public class MadeForYouTests
         var mine = new[]
         {
             new PlaylistInfo("spotify:playlist:dw", "dw", "Discover Weekly", "spotify", "Spotify", "http://img/dw", null),
-            new PlaylistInfo("spotify:playlist:me", "me", "My Jams", "jos", "Jos", null, null),
+            new PlaylistInfo("spotify:playlist:me", "me", "My Jams", "alex", "Alex", null, null),
             new PlaylistInfo("spotify:playlist:dm2", "dm2", "Daily Mix 2", "spotify", "Spotify", null, null),
             new PlaylistInfo("spotify:playlist:zz", "zz", "Zebra Mix", "spotify", "Spotify", null, null),
         };

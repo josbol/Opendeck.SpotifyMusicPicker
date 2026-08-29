@@ -24,10 +24,10 @@ public static class Scenario
         var albumA2 = TestData.Album("A2", "Album A", "arA", "Artist A", Img("grey"));   // another edition of album A
         var albumE = TestData.Album("E", "Album E", "arE", "Artist E", Img("grey"));
 
-        api.Json("GET", "/v1/me", new { id = "jos", display_name = "Jos" });
+        api.Json("GET", "/v1/me", new { id = "alex", display_name = "Alex" });
         api.Json("GET", "/v1/me/playlists", TestData.Paged(new object?[]
         {
-            null, TestData.Playlist("dm1", "Daily Mix 1", "spotify", Img("red")), TestData.Playlist("mine", "My Jams", "jos", Img("grey")), null, TestData.Playlist("dw", "Discover Weekly", "spotify", Img("grey")),
+            null, TestData.Playlist("dm1", "Daily Mix 1", "spotify", Img("red")), TestData.Playlist("mine", "My Jams", "alex", Img("grey")), null, TestData.Playlist("dw", "Discover Weekly", "spotify", Img("grey")),
         }));
         api.Json("GET", "/v1/me/player/recently-played", TestData.Paged(new object?[]
         {
@@ -50,7 +50,7 @@ public static class Scenario
             _ => (404, (object?)new { error = "not found" }),
         });
         api.Json("GET", "/v1/albums/A", albumA); api.Json("GET", "/v1/albums/B", albumB); api.Json("GET", "/v1/albums/C", albumC); api.Json("GET", "/v1/albums/D", albumD); api.Json("GET", "/v1/albums/E", albumE);
-        api.Json("GET", "/v1/playlists/mine", TestData.Playlist("mine", "My Jams", "jos", Img("grey")));
+        api.Json("GET", "/v1/playlists/mine", TestData.Playlist("mine", "My Jams", "alex", Img("grey")));
         api.Json("GET", "/v1/playlists/HID", FakeSpotify.SpotifyError(404, "Resource not found"), 404);
         api.Json("GET", "/v1/me/top/tracks", TestData.Paged(new object?[]
         {
@@ -69,10 +69,10 @@ public static class Scenario
         api.Json("GET", "/v1/me/player", new
         {
             is_playing = true, progress_ms = 30_000, shuffle_state = false, context = new { uri = "spotify:album:A", type = "album" },
-            device = new { id = "dev1", name = "laptopjos", type = "Computer", is_active = true, volume_percent = 62 },
+            device = new { id = "dev1", name = "studio-pc", type = "Computer", is_active = true, volume_percent = 62 },
             item = TestData.Track("t1", "Song 1", albumA, "arA", "Artist A"),
         });
-        api.Json("GET", "/v1/me/player/devices", new { devices = new[] { new { id = "dev1", name = "laptopjos", type = "Computer", is_active = false, volume_percent = 62 } } });
+        api.Json("GET", "/v1/me/player/devices", new { devices = new[] { new { id = "dev1", name = "studio-pc", type = "Computer", is_active = false, volume_percent = 62 } } });
         api.Json("PUT", "/v1/me/player/play", (req, body) => req.QueryString["device_id"] is null ? (404, FakeSpotify.SpotifyError(404, "Player command failed: No active device found", "NO_ACTIVE_DEVICE")) : (204, null));
         api.Empty("PUT", "/v1/me/player/pause"); api.Empty("PUT", "/v1/me/player/volume"); api.Empty("PUT", "/v1/me/player");
         api.Empty("POST", "/v1/me/player/next"); api.Empty("POST", "/v1/me/player/previous");
@@ -88,12 +88,12 @@ public static class Scenario
         LocalPlayer.Player = "no-such-player-for-tests";   // never touch a real Spotify client from the tests
         var dir = TestData.TempDir();
         var tokens = Path.Combine(dir, "tokens.json");
-        File.WriteAllText(tokens, JsonSerializer.Serialize(new TokenSet { ClientId = "cid", AccessToken = "tok", RefreshToken = "ref", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1), UserName = "Jos", Scope = SpotifyAuth.Scopes }));
+        File.WriteAllText(tokens, JsonSerializer.Serialize(new TokenSet { ClientId = "cid", AccessToken = "tok", RefreshToken = "ref", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1), UserName = "Alex", Scope = SpotifyAuth.Scopes }));
         var auth = new SpotifyAuth(http, tokens) { AccountsUrl = api.AccountsUrl, ApiUrl = api.ApiUrl };
         var client = new SpotifyClient(auth, http) { BaseUrl = api.ApiUrl };
         var curator = new Curator(client, auth, new PlayHistory(Path.Combine(dir, "history.json")), new MetadataCache(Path.Combine(dir, "meta.json")), new ArtCache(http, Path.Combine(dir, "art")), new OEmbedClient(http) { BaseUrl = $"http://127.0.0.1:{api.Port}/oembed" })
         {
-            HostName = () => "laptopjos",
+            HostName = () => "studio-pc",
         };
         curator.Settings.MadeForYouLinks = "spotify:playlist:HID | Daily Mix 2";
         return (curator, dir);

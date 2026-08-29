@@ -42,7 +42,7 @@ public class CuratorIntegrationTests : IDisposable
         Assert.Equal(new[] { "spotify:album:A", "spotify:playlist:mine", "spotify:artist:arA", "spotify:album:D", "spotify:album:E" }, s.Frequent.Select(i => i.Uri));
         Assert.Equal(("Artist A", "Artist"), (s.Frequent[2].Name, s.Frequent[2].Subtitle));
         Assert.Equal("3 plays in 30 days", s.Frequent[0].Source); Assert.Equal("Artist A", s.Frequent[0].Subtitle);
-        Assert.Equal(("My Jams", "by jos"), (s.Frequent[1].Name, s.Frequent[1].Subtitle));
+        Assert.Equal(("My Jams", "by alex"), (s.Frequent[1].Name, s.Frequent[1].Subtitle));
         Assert.Equal("3 of your top tracks", s.Frequent[3].Source);
 
         Assert.Equal(3, s.Recommended.Count);
@@ -200,7 +200,7 @@ public class EndToEndTests
         await opendeck.SendAsync(new { @event = "propertyInspectorDidAppear", action = slot, context = "Keypad.0.0", device = "ulanzi-d200x" });
         var pi = await opendeck.WaitForAsync(m => m.GetProperty("event").GetString() == "sendToPropertyInspector" && m.GetProperty("context").GetString() == "Keypad.0.0");
         Assert.True(pi.GetProperty("payload").GetProperty("status").GetProperty("connected").GetBoolean());
-        Assert.Equal("Jos", pi.GetProperty("payload").GetProperty("status").GetProperty("user").GetString());
+        Assert.Equal("Alex", pi.GetProperty("payload").GetProperty("status").GetProperty("user").GetString());
 
         cts.Cancel();
         try { await run; } catch (OperationCanceledException) { }

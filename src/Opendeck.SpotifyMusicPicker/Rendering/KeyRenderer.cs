@@ -72,7 +72,7 @@ public sealed class KeyRenderer
             Circle(c, new SKPoint(Size - 20, 20), 13, Green);
             if (playing) Triangle(c, new SKPoint(Size - 20, 20), 7, SKColors.Black); else Pause(c, new SKPoint(Size - 20, 20), 6, SKColors.Black);
         }
-        return Encode(s);
+        return Encode(s, photo: drewArt);
     }
 
     public string EmptyKey(string rowLabel, int slot)
@@ -122,7 +122,7 @@ public sealed class KeyRenderer
         if (progress != Progress.Off) ProgressBar(c, new SKRect(8, Size - 9, Size - 8, Size - 5), p.ProgressFraction(Steps(progress)));
         Circle(c, new SKPoint(Size - 20, 20), 13, p.IsPlaying ? Green : Card);
         if (p.IsPlaying) Pause(c, new SKPoint(Size - 20, 20), 6, SKColors.Black); else Triangle(c, new SKPoint(Size - 19, 20), 7, Text);
-        return Encode(s);
+        return Encode(s, photo: art is not null);
     }
 
     /// <summary>Now playing for a 2:1 screen: composed at 288×144, then squeezed into the 144 square.
@@ -156,7 +156,7 @@ public sealed class KeyRenderer
         using var img = wide.Snapshot();
         using var s = NewSurface();
         s.Canvas.DrawImage(img, new SKRect(0, 0, Size, Size), Sampling);
-        return Encode(s);
+        return Encode(s, photo: art is not null);
     }
 
     /// <summary>Previous / next track glyphs (for when the transport actions sit on keys with a display).</summary>
@@ -185,11 +185,13 @@ public sealed class KeyRenderer
         return s;
     }
 
-    private static string Encode(SKSurface s)
+    private static string Encode(SKSurface s, bool photo = false)
     {
         using var img = s.Snapshot();
-        using var data = img.Encode(SKEncodedImageFormat.Png, 90);
-        return "data:image/png;base64," + Convert.ToBase64String(data.AsSpan());
+        // OpenDeck redraws every key on its own canvas and hands the device a JPEG, so a photo key may travel as
+        // JPEG (a fifth of the bytes, faster to encode and decode); flat graphics stay PNG for crisp edges
+        using var data = photo ? img.Encode(SKEncodedImageFormat.Jpeg, 92) : img.Encode(SKEncodedImageFormat.Png, 90);
+        return (photo ? "data:image/jpeg;base64," : "data:image/png;base64,") + Convert.ToBase64String(data.AsSpan());
     }
 
     /// <summary>Center-crops the image into the rect. False when the bytes cannot be decoded.</summary>

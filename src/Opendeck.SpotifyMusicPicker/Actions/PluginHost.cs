@@ -21,6 +21,9 @@ public sealed class PluginHost : IAsyncDisposable
     public Func<string, string, Task<bool>>? ProfileSwitcher { get; set; }
 
     private readonly Dictionary<string, DeckAction> _actions = new();
+    /// <summary>Last image sent per context, kept across willDisappear/willAppear: OpenDeck stores it with the key and
+    /// draws it itself when the layout comes back, so sending it again would only make its renderer work twice.</summary>
+    private readonly Dictionary<string, string> _sent = new();
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cts = new();
     private int _renderPending;
@@ -41,22 +44,32 @@ public sealed class PluginHost : IAsyncDisposable
     {
         if (ProfileSwitcher is not null) return await ProfileSwitcher(device, profile);
         var message = Json.Serialize(new { @event = "switchProfile", device, profile });
-        foreach (var (file, prefix) in new[] { ("opendeck", Array.Empty<string>()), ("/usr/bin/opendeck", Array.Empty<string>()), ("flatpak", new[] { "run", "me.amankhanna.opendeck" }) })
+        // Fastest: hand the CLI arguments straight to the running OpenDeck through its single-instance D-Bus hook
+        // (what `opendeck --process-message` does after ~300 ms of Tauri start-up). Then the CLI itself.
+        var attempts = new List<(string File, string[] Args)>
+        {
+            ("busctl", new[] { "--user", "--", "call", "me.amankhanna.opendeck.SingleInstance", "/me/amankhanna/opendeck/SingleInstance", "org.SingleInstance.DBus", "ExecuteCallback", "ass", "3", "opendeck", "--process-message", message, Environment.CurrentDirectory }),
+            ("opendeck", new[] { "--process-message", message }),
+            ("/usr/bin/opendeck", new[] { "--process-message", message }),
+            ("flatpak", new[] { "run", "me.amankhanna.opendeck", "--process-message", message }),
+        };
+        foreach (var (file, args) in attempts)
         {
             try
             {
                 var psi = new ProcessStartInfo(file) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
-                foreach (var a in prefix) psi.ArgumentList.Add(a);
-                psi.ArgumentList.Add("--process-message"); psi.ArgumentList.Add(message);
+                foreach (var a in args) psi.ArgumentList.Add(a);
+                var started = Stopwatch.StartNew();
                 using var p = Process.Start(psi);
                 if (p is null) continue;
                 await p.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
-                Log.Info($"switchProfile {device} → '{profile}' via {file} (exit {p.ExitCode})");
+                if (p.ExitCode != 0) { Log.Debug($"{file} exit {p.ExitCode}: {(await p.StandardError.ReadToEndAsync()).Trim()}"); continue; }
+                Log.Info($"switchProfile {device} → '{profile}' via {file} in {started.ElapsedMilliseconds} ms");
                 return true;
             }
             catch (Exception ex) { Log.Debug($"{file}: {ex.Message}"); }
         }
-        Log.Warn("Could not run the opendeck CLI to switch profiles");
+        Log.Warn("Could not reach OpenDeck to switch profiles (D-Bus and CLI both failed)");
         return false;
     }
 
@@ -118,7 +131,7 @@ public sealed class PluginHost : IAsyncDisposable
                 var action = Create(e.Action, e.Context);
                 if (action is null) { Log.Warn($"Unknown action {e.Action}"); return; }
                 action.Device = e.Device; action.Controller = e.Controller; action.Settings = e.Settings.Clone();
-                int count; lock (_lock) { _actions[e.Context] = action; count = _actions.Count; }
+                int count; lock (_lock) { _actions[e.Context] = action; count = _actions.Count; action.LastImage = _sent.GetValueOrDefault(e.Context); }
                 Log.Info($"willAppear {e.Action} @ {e.Context} ({e.Controller})");
                 UpdateVisibility();
                 await action.OnAppearAsync();
@@ -232,6 +245,7 @@ public sealed class PluginHost : IAsyncDisposable
             var img = a.Render(snap, now);
             if (img is null || img == a.LastImage) return;
             a.LastImage = img;
+            lock (_lock) _sent[a.Context] = img;
             Deck.SetImage(a.Context, img);
         }
         catch (Exception ex) { Log.Error($"render {a.ActionUuid} failed", ex); }

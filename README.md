@@ -37,6 +37,7 @@ Spotify's API rules changed twice (November 2024, February 2026) and this plugin
 | Suggested | `GET /me/albums` (saved albums not played lately), `GET /me/top/artists` + `GET /me/following` → `GET /artists/{id}/albums`; `/recommendations`, `/browse/new-releases` and `related-artists` are gone |
 | Now playing / transport / volume | the player endpoints (`/me/player…`), `playerctl -p spotify` as fallback |
 | Covers | `GET /albums/{id}`, `GET /playlists/{id}` (batch endpoints were removed, so results are cached on disk) |
+| Layout switch (dial press) | plugins may not send `switchProfile` over the socket, so the message is handed to the running OpenDeck through its single-instance D-Bus hook (`busctl … org.SingleInstance.DBus ExecuteCallback`, a few ms); `opendeck --process-message` (~300 ms) is the fallback |
 
 Nothing is sent anywhere but api.spotify.com; the OAuth tokens live in `~/.local/share/opendeck-spotifymusicpicker/tokens.json` (mode 600).
 
@@ -86,6 +87,9 @@ is composed at 2:1 and squeezed to a square; the D200X plugin (≥ 1.3) expands 
 action on this layout is set to *Action icon* with fit *Stretch* — `install-profile.py` writes exactly that into the
 copied action (`--wide-mode`, `--wide-fit`), so the Default layout keeps its clock / system monitor and the Spotify
 layout shows the music.
+
+Switching layouts is quick because OpenDeck keeps the last image of every key: the plugin remembers what it sent and
+does not send it again on re-appear, so OpenDeck's renderer draws each key once; photo keys travel as JPEG.
 
 OpenDeck keeps loaded profiles in memory and writes them back to disk when it exits, so to change a profile it
 already knows (`--main-dial`): **stop OpenDeck, run `install-profile.py`, start OpenDeck** (a new, never-selected

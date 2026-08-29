@@ -115,7 +115,7 @@ if (args.Length > 0 && args[0].StartsWith("--"))
             Save("connect", r.ConnectKey(null));
             Save("error", r.ConnectKey("token refresh failed (400)"));
             Save("loading", r.MessageKey("Spotify", "loading…"));
-            var pb = new PlaybackState { IsPlaying = true, TrackName = "The Great Gig in the Sky", Artists = "Pink Floyd", AlbumName = "The Dark Side of the Moon", ProgressMs = 95_000, DurationMs = 283_000, VolumePercent = 62, DeviceName = "laptop", At = DateTimeOffset.UtcNow };
+            var pb = new PlaybackState { IsPlaying = true, TrackUri = "spotify:track:sample", TrackName = "The Great Gig in the Sky", Artists = "Pink Floyd", AlbumName = "The Dark Side of the Moon", ProgressMs = 95_000, DurationMs = 283_000, VolumePercent = 62, DeviceName = "laptop", At = DateTimeOffset.UtcNow };
             Save("nowplaying", r.NowPlayingKey(pb, art));
             Save("nowplaying-paused", r.NowPlayingKey(pb with { IsPlaying = false }, art));
             Save("nowplaying-none", r.NowPlayingKey(null, null));

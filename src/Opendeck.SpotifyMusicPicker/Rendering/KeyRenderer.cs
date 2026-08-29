@@ -163,7 +163,7 @@ public sealed class KeyRenderer
     public string LikeKey(PlaybackState? p, byte[]? art, bool canModify)
     {
         using var s = NewSurface(); var c = s.Canvas;
-        var haveTrack = p?.TrackUri is not null;
+        var haveTrack = p is not null && (p.TrackUri is not null || p.TrackName is not null);
         if (haveTrack && DrawArt(c, art, new SKRect(0, 0, Size, Size))) Fill(c, new SKRect(0, 0, Size, Size), SKColors.Black.WithAlpha(150));
         var liked = p?.Liked == true;
         var heart = liked ? "♥" : "♡";

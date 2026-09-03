@@ -2,7 +2,7 @@
 	"Name": "Spotify Music Picker",
 	"Description": "A whole-deck Spotify layout: your Made-for-you playlists, the albums and playlists you play most, three album suggestions, now playing on the wide screen, previous/next on the side buttons, and a volume dial that switches layouts.",
 	"Author": "Jos Bol",
-	"Version": "0.1.0",
+	"Version": "0.1.1",
 	"Icon": "icons/plugin",
 	"Category": "Spotify Music Picker",
 	"CategoryIcon": "icons/plugin",

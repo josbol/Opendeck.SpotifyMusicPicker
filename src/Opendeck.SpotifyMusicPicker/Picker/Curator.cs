@@ -35,6 +35,8 @@ public sealed class Curator : IDisposable
     public Snapshot Current { get; private set; } = new() { At = DateTimeOffset.UtcNow };
     /// <summary>Picker keys are on screen: poll playback quickly.</summary>
     public bool KeypadVisible { get; set; }
+    /// <summary>How long a volume the dial set outranks what Spotify reports: its player state lags a few seconds behind a volume change.</summary>
+    public TimeSpan VolumeHold { get; set; } = TimeSpan.FromSeconds(5);
     public Func<string> HostName { get; set; } = () => Environment.MachineName;
 
     public event Action<Snapshot>? Changed;
@@ -47,8 +49,12 @@ public sealed class Curator : IDisposable
     private DateTimeOffset _poolAt;
     private HashSet<string> _playedLately = new();
     private int _reroll, _madeOffset, _freqOffset;
-    private int _pendingVolume = -1;
-    private int _volumeSending;
+    private readonly object _volumeLock = new();
+    private int _volumeTarget = -1;                 // what the dial last asked for; -1 = never touched
+    private bool _volumeSending;                    // one sender at a time; it drains _volumeTarget
+    private DateTimeOffset _volumeHoldUntil;        // playback polls may not overwrite VolumePercent before this
+    private DateTimeOffset _volumeApiBackoffUntil;  // rate limited: leave the Web API alone until this
+    private static readonly TimeSpan VolumeSettle = TimeSpan.FromMilliseconds(150), VolumeSpacing = TimeSpan.FromMilliseconds(250);
     private string? _likedTrack;   // the track _liked is known for
     private bool? _liked;
 
@@ -417,8 +423,16 @@ public sealed class Curator : IDisposable
             if (track != _likedTrack) { _liked = PickItem.KindOf(track) == ItemKind.Track ? await Client.LibraryContainsAsync(track, ct) : null; _likedTrack = track; }
             state = state with { Liked = _liked };
         }
+        state = HoldVolume(state);
         var changed = state is null ? Current.Playback is not null : !state.LooksLike(Current.Playback);
         Publish(Current with { Playback = state, At = now }, notify: changed);
+    }
+
+    /// <summary>Spotify reports a just-set volume late; keep what the dial asked for while the hold lasts.</summary>
+    private PlaybackState? HoldVolume(PlaybackState? state)
+    {
+        if (state is null) return null;
+        lock (_volumeLock) return _volumeTarget >= 0 && (_volumeSending || DateTimeOffset.UtcNow < _volumeHoldUntil) ? state with { VolumePercent = _volumeTarget } : state;
     }
 
     private void PokePlaybackSoon(int ms = 700) => _ = Task.Run(async () => { await Task.Delay(ms); RequestPlayback(); });
@@ -498,33 +512,59 @@ public sealed class Curator : IDisposable
         return true;
     }
 
-    /// <summary>Volume by a relative step; sends are coalesced so a quick spin is one request.</summary>
+    /// <summary>Volume by a relative step. One request is in flight at a time and the newest target wins, so a fast
+    /// spin is a few requests, not one per tick. Steps build on the last target (not on a possibly stale poll) while
+    /// the hold lasts, and a rate-limited Web API is left alone for its Retry-After instead of stalling the dial.</summary>
     public void VolumeDelta(int delta)
     {
-        var cur = Interlocked.CompareExchange(ref _pendingVolume, 0, 0);
-        if (cur < 0) cur = Current.Playback?.VolumePercent ?? 50;
-        var target = Math.Clamp(cur + delta, 0, 100);
-        Interlocked.Exchange(ref _pendingVolume, target);
-        if (Current.Playback is { } p) Publish(Current with { Playback = p with { VolumePercent = target } }, notify: false);
-        if (Interlocked.CompareExchange(ref _volumeSending, 1, 0) == 0) _ = Task.Run(SendVolumeAsync);
+        var now = DateTimeOffset.UtcNow;
+        bool start;
+        lock (_volumeLock)
+        {
+            var cur = _volumeTarget >= 0 && now < _volumeHoldUntil ? _volumeTarget : Current.Playback?.VolumePercent ?? (_volumeTarget >= 0 ? _volumeTarget : 50);
+            _volumeTarget = Math.Clamp(cur + delta, 0, 100);
+            _volumeHoldUntil = now + VolumeHold;
+            if (Current.Playback is { } p) Publish(Current with { Playback = p with { VolumePercent = _volumeTarget } }, notify: false);
+            start = !_volumeSending;
+            _volumeSending = true;
+        }
+        if (start) _ = Task.Run(SendVolumeAsync);
     }
 
     private async Task SendVolumeAsync()
     {
+        var failed = false;
         try
         {
-            await Task.Delay(150);
-            int last;
-            do
+            await Task.Delay(VolumeSettle, _cts.Token);   // let a burst of ticks settle into one request
+            while (true)
             {
-                last = Interlocked.CompareExchange(ref _pendingVolume, 0, 0);
-                var r = await Client.VolumeAsync(last, _cts.Token);
-                if (!r.Ok) { Log.Debug($"volume: {r.Describe()}"); await LocalPlayer.VolumeAsync(last); }
-                await Task.Delay(100);
-            } while (Interlocked.CompareExchange(ref _pendingVolume, 0, 0) != last);
+                int target; bool useApi;
+                lock (_volumeLock) { target = _volumeTarget; useApi = DateTimeOffset.UtcNow >= _volumeApiBackoffUntil; }
+                var ok = false;
+                if (useApi)
+                {
+                    var r = await Client.VolumeAsync(target, _cts.Token);
+                    ok = r.Ok;
+                    if (!ok)
+                    {
+                        Log.Debug($"volume: {r.Describe()}");
+                        if (r.Status == 429) lock (_volumeLock) _volumeApiBackoffUntil = DateTimeOffset.UtcNow + (r.RetryAfter ?? TimeSpan.FromSeconds(5));
+                    }
+                }
+                if (!ok) ok = await LocalPlayer.VolumeAsync(target);
+                failed = !ok;
+                lock (_volumeLock) _volumeHoldUntil = ok ? DateTimeOffset.UtcNow + VolumeHold : DateTimeOffset.MinValue;   // a failed send: let the next poll tell the truth
+                await Task.Delay(VolumeSpacing, _cts.Token);
+                lock (_volumeLock) if (_volumeTarget == target) { _volumeSending = false; break; }
+            }
         }
-        catch (Exception ex) { Log.Debug($"volume: {ex.Message}"); }
-        finally { Interlocked.Exchange(ref _volumeSending, 0); Interlocked.Exchange(ref _pendingVolume, -1); PokePlaybackSoon(1500); }
+        catch (Exception ex)
+        {
+            if (ex is not OperationCanceledException) Log.Debug($"volume: {ex.Message}");
+            lock (_volumeLock) _volumeSending = false;
+        }
+        if (failed && !_cts.IsCancellationRequested) PokePlaybackSoon(1500);
     }
 
     public object Describe() => new

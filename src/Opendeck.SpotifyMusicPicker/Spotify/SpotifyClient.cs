@@ -6,7 +6,7 @@ using Opendeck.SpotifyMusicPicker.Util;
 
 namespace Opendeck.SpotifyMusicPicker.Spotify;
 
-public sealed record ApiResponse(int Status, JsonElement Body, string? Error)
+public sealed record ApiResponse(int Status, JsonElement Body, string? Error, TimeSpan? RetryAfter = null)
 {
     public bool Ok => Status is >= 200 and < 300;
     public bool NotFound => Status == 404;
@@ -37,7 +37,8 @@ public sealed class SpotifyClient
 
     public Task<ApiResponse> GetAsync(string pathOrUrl, CancellationToken ct = default) => SendAsync(HttpMethod.Get, pathOrUrl, null, ct);
 
-    public async Task<ApiResponse> SendAsync(HttpMethod method, string pathOrUrl, object? body, CancellationToken ct = default)
+    /// <param name="maxRetryAfter">Longest Retry-After worth sleeping through (default 30 s); a longer one comes back as the 429 it is.</param>
+    public async Task<ApiResponse> SendAsync(HttpMethod method, string pathOrUrl, object? body, CancellationToken ct = default, TimeSpan? maxRetryAfter = null)
     {
         for (var attempt = 0; attempt < 3; attempt++)
         {
@@ -55,10 +56,12 @@ public sealed class SpotifyClient
                 var status = (int)resp.StatusCode;
                 var text = await resp.Content.ReadAsStringAsync(ct);
                 if (status == 401 && attempt == 0) { if (await _auth.ForceRefreshAsync(ct)) continue; return new(401, default, _auth.Error ?? "unauthorized"); }
-                if (status == 429 && attempt < 2)
+                TimeSpan? retryAfter = null;
+                if (status == 429)
                 {
                     var wait = resp.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(2);
-                    if (wait <= TimeSpan.FromSeconds(30)) { Log.Warn($"rate limited, waiting {wait.TotalSeconds:0}s"); await Task.Delay(wait + TimeSpan.FromMilliseconds(250), ct); continue; }
+                    if (attempt < 2 && wait <= (maxRetryAfter ?? TimeSpan.FromSeconds(30))) { Log.Warn($"rate limited, waiting {wait.TotalSeconds:0}s"); await Task.Delay(wait + TimeSpan.FromMilliseconds(250), ct); continue; }
+                    retryAfter = wait;
                 }
                 if (status >= 500 && attempt == 0) { await Task.Delay(1000, ct); continue; }
                 JsonElement el = default; string? error = null;
@@ -70,7 +73,7 @@ public sealed class SpotifyClient
                     Log.Debug($"{method} {pathOrUrl} → {status} {error}");
                 }
                 else Log.Debug($"{method} {pathOrUrl} → {status}");
-                return new(status, el, error);
+                return new(status, el, error, retryAfter);
             }
         }
         return new(0, default, "gave up");
@@ -208,7 +211,8 @@ public sealed class SpotifyClient
     public Task<ApiResponse> PauseAsync(CancellationToken ct) => SendAsync(HttpMethod.Put, "/me/player/pause", null, ct);
     public Task<ApiResponse> NextAsync(CancellationToken ct) => SendAsync(HttpMethod.Post, "/me/player/next", null, ct);
     public Task<ApiResponse> PreviousAsync(CancellationToken ct) => SendAsync(HttpMethod.Post, "/me/player/previous", null, ct);
-    public Task<ApiResponse> VolumeAsync(int percent, CancellationToken ct) => SendAsync(HttpMethod.Put, $"/me/player/volume?volume_percent={Math.Clamp(percent, 0, 100)}", null, ct);
+    /// <summary>Volume; a dial cannot wait out a long Retry-After, so only a short one is slept through.</summary>
+    public Task<ApiResponse> VolumeAsync(int percent, CancellationToken ct) => SendAsync(HttpMethod.Put, $"/me/player/volume?volume_percent={Math.Clamp(percent, 0, 100)}", null, ct, maxRetryAfter: TimeSpan.FromSeconds(1));
     public Task<ApiResponse> TransferAsync(string deviceId, bool play, CancellationToken ct) => SendAsync(HttpMethod.Put, "/me/player", new { device_ids = new[] { deviceId }, play }, ct);
 
     // ---- parsing (tolerant: Spotify keeps removing fields) --------------------------------

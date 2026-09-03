@@ -18,6 +18,8 @@ public sealed class FakeSpotify : IDisposable
     public ConcurrentQueue<(string Method, string Path, string Query, string Body)> Requests { get; } = new();
     /// <summary>Key: "GET /v1/me/playlists" (path without query). Value: status + body (JSON or bytes).</summary>
     public ConcurrentDictionary<string, Func<HttpListenerRequest, string, (int Status, byte[] Body, string ContentType)>> Routes { get; } = new();
+    /// <summary>Extra response headers per route key, e.g. Retry-After on a 429.</summary>
+    public ConcurrentDictionary<string, Dictionary<string, string>> Headers { get; } = new();
 
     public FakeSpotify()
     {
@@ -42,6 +44,7 @@ public sealed class FakeSpotify : IDisposable
     };
     public void Bytes(string method, string path, byte[] data, string contentType) => Routes[$"{method} {path}"] = (_, _) => (200, data, contentType);
     public void Empty(string method, string path, int status = 204) => Routes[$"{method} {path}"] = (_, _) => (status, Array.Empty<byte>(), "application/json");
+    public void Header(string method, string path, string name, string value) => Headers.GetOrAdd($"{method} {path}", _ => new())[name] = value;
     public static object SpotifyError(int status, string message, string? reason = null) => new { error = new { status, message, reason } };
 
     public int Count(string method, string path) => Requests.Count(r => r.Method == method && r.Path == path);
@@ -64,6 +67,7 @@ public sealed class FakeSpotify : IDisposable
                     int status; byte[] data; string type;
                     if (Routes.TryGetValue($"{req.HttpMethod} {path}", out var h)) (status, data, type) = h(req, body);
                     else (status, data, type) = (404, Encoding.UTF8.GetBytes(JsonSerializer.Serialize(SpotifyError(404, $"no route for {req.HttpMethod} {path}"))), "application/json");
+                    if (Headers.TryGetValue($"{req.HttpMethod} {path}", out var extra)) foreach (var (k, v) in extra) ctx.Response.AddHeader(k, v);
                     ctx.Response.StatusCode = status; ctx.Response.ContentType = type; ctx.Response.ContentLength64 = data.Length;
                     await ctx.Response.OutputStream.WriteAsync(data);
                     ctx.Response.Close();

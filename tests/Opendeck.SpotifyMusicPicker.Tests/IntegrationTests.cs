@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Opendeck.SpotifyMusicPicker.Actions;
 using Opendeck.SpotifyMusicPicker.Deck;
@@ -21,6 +22,73 @@ public class CuratorIntegrationTests : IDisposable
     }
 
     public void Dispose() { _curator.Dispose(); _api.Dispose(); }
+
+    /// <summary>Waits until no request for the route has arrived for <paramref name="quietMs"/> (and at least one has).</summary>
+    private async Task WaitForQuietAsync(string method, string path, int quietMs = 400)
+    {
+        var until = DateTime.UtcNow.AddSeconds(5);
+        var last = _api.Count(method, path);
+        while (DateTime.UtcNow < until)
+        {
+            await Task.Delay(quietMs);
+            var n = _api.Count(method, path);
+            if (n == last && n > 0) return;
+            last = n;
+        }
+    }
+
+    [Fact]
+    public async Task VolumeStepsBuildOnTheLastTargetAndOutrankStalePolls()
+    {
+        _curator.VolumeHold = TimeSpan.FromMilliseconds(600);
+        await _curator.RefreshPlaybackAsync(CancellationToken.None);
+        Assert.Equal(62, _curator.Current.Playback!.VolumePercent);
+
+        // a fast spin: 20 ticks in ~400 ms become a handful of requests, the last one carrying the final value
+        for (var i = 0; i < 20; i++) { _curator.VolumeDelta(1); await Task.Delay(20); }
+        await WaitForQuietAsync("PUT", "/v1/me/player/volume");
+        var volumes = _api.Requests.Where(r => r.Path == "/v1/me/player/volume").ToList();
+        Assert.InRange(volumes.Count, 1, 5);
+        Assert.Contains("volume_percent=82", volumes[^1].Query);
+
+        // Spotify still reports the old volume: the value the dial set wins while the hold lasts…
+        await _curator.RefreshPlaybackAsync(CancellationToken.None);
+        Assert.Equal(82, _curator.Current.Playback!.VolumePercent);
+        _curator.VolumeDelta(-5);                                                          // …and the next step builds on it
+        Assert.Equal(77, _curator.Current.Playback!.VolumePercent);
+        await WaitForQuietAsync("PUT", "/v1/me/player/volume");
+        Assert.Contains("volume_percent=77", _api.Requests.Last(r => r.Path == "/v1/me/player/volume").Query);
+
+        // …until the hold expires; then the poll is the truth again
+        await Task.Delay(700);
+        await _curator.RefreshPlaybackAsync(CancellationToken.None);
+        Assert.Equal(62, _curator.Current.Playback!.VolumePercent);
+    }
+
+    [Fact]
+    public async Task RateLimitedVolumeDoesNotStallTheDial()
+    {
+        _api.Json("PUT", "/v1/me/player/volume", FakeSpotify.SpotifyError(429, "Too many requests", "QUOTA_EXCEEDED"), 429);
+        _api.Header("PUT", "/v1/me/player/volume", "Retry-After", "20");
+        await _curator.RefreshPlaybackAsync(CancellationToken.None);
+
+        var r = await _curator.Client.VolumeAsync(50, CancellationToken.None);            // a 20 s Retry-After is not slept through
+        Assert.Equal((429, TimeSpan.FromSeconds(20)), (r.Status, r.RetryAfter));
+        Assert.Equal(1, _api.Count("PUT", "/v1/me/player/volume"));
+
+        var sw = Stopwatch.StartNew();
+        _curator.VolumeDelta(5);
+        await WaitForQuietAsync("PUT", "/v1/me/player/volume");
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(3), $"dial blocked for {sw.Elapsed}");
+        Assert.Equal(2, _api.Count("PUT", "/v1/me/player/volume"));
+
+        _curator.VolumeDelta(5);                                                            // the Web API is left alone for the Retry-After…
+        await Task.Delay(600);
+        Assert.Equal(2, _api.Count("PUT", "/v1/me/player/volume"));
+
+        await _curator.RefreshPlaybackAsync(CancellationToken.None);                        // …and as nothing was applied, the poll is trusted
+        Assert.Equal(62, _curator.Current.Playback!.VolumePercent);
+    }
 
     [Fact]
     public async Task BuildsTheThreeRowsFromWhatSpotifyStillExposes()

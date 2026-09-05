@@ -80,16 +80,18 @@ you install as a symlink.
 ```
  row 0 │ Made for you 1 │ 2 │ 3 │ 4 │ 5
  row 1 │ Most played 1  │ 2 │ 3 │ 4 │ 5
- row 2 │ Suggested 1 │ 2 │ Like / unlike │ Now playing (wide screen) │ D200X "Wide screen" action (copied from Default)
+ row 2 │ Suggested 1 │ 2 │ Like / unlike │ Now playing (wide screen)
  dials │ 0: Spotify volume, press → back to Default │ 1: copied from Default (e.g. PipeWire volume) │ 2: browse / new suggestions
  side  │ 1: previous track │ 2: next track
+ infobar │ D200X "Wide screen" action (copied from Default): the slot between the side buttons, no display, no press
 ```
 
-OpenDeck squeezes every key into a 144×144 image before it reaches a device plugin, so the wide now-playing image
-is composed at 2:1 and squeezed to a square; the D200X plugin (≥ 1.3) expands it again when its **Wide screen**
-action on this layout is set to *Action icon* with fit *Stretch* — `install-profile.py` writes exactly that into the
-copied action (`--wide-mode`, `--wide-fit`), so the Default layout keeps its clock / system monitor and the Spotify
-layout shows the music.
+The wide now-playing image is composed at the D200X screen's own 458×196. Stock OpenDeck squeezes every key into a
+144×144 image before it reaches a device plugin, and the D200X plugin (≥ 1.3) expands it again when its **Wide
+screen** action on this layout is set to *Action icon* with fit *Stretch* — `install-profile.py` writes exactly that
+into the copied action (`--wide-mode`, `--wide-fit`), so the Default layout keeps its clock / system monitor and the
+Spotify layout shows the music. An OpenDeck that renders the wide key at 458×196
+([josbol/OpenDeck](https://github.com/josbol/OpenDeck)) draws it one to one, and the fit no longer matters.
 
 Switching layouts is quick because OpenDeck keeps the last image of every key: the plugin remembers what it sent and
 does not send it again on re-appear, so OpenDeck's renderer draws each key once; photo keys travel as JPEG.

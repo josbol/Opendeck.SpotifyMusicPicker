@@ -16,11 +16,11 @@ files = [os.path.join(src, n + ".png") for n in order if os.path.exists(os.path.
 cols = 6; cell = 150; rows = (len(files) + cols - 1) // cols
 wide = os.path.join(src, "nowplaying-wide.png")
 extra = 1 if os.path.exists(wide) else 0
-sheet = Image.new("RGB", (cols * cell, (rows + extra) * cell), (30, 32, 38))
+sheet = Image.new("RGB", (cols * cell, rows * cell + (196 + 6) * extra), (30, 32, 38))   # the wide row is taller
 for i, f in enumerate(files):
     sheet.paste(Image.open(f).convert("RGB"), ((i % cols) * cell + 3, (i // cols) * cell + 3))
 if extra:
-    w = Image.open(wide).convert("RGB").resize((288, 144), Image.Resampling.LANCZOS)   # as the D200X shows it
+    w = Image.open(wide).convert("RGB").resize((458, 196), Image.Resampling.LANCZOS)   # its native size, as the D200X shows it
     sheet.paste(w, (3, rows * cell + 3))
 sheet.save(out, optimize=True); print("wrote", out, sheet.size)
 PY

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Opendeck.SpotifyMusicPicker.Actions;
 using Opendeck.SpotifyMusicPicker.Deck;
+using Opendeck.SpotifyMusicPicker.Rendering;
 using Opendeck.SpotifyMusicPicker.Spotify;
 using Opendeck.SpotifyMusicPicker.Tests.Support;
 using SkiaSharp;
@@ -193,11 +194,13 @@ public class CuratorIntegrationTests : IDisposable
 
 public class EndToEndTests
 {
-    private static (byte R, byte G, byte B) Pixel(JsonElement setImage, int x, int y)
+    /// <summary>Decodes a setImage and reads one pixel; every key image is the 144 square OpenDeck renders, except the
+    /// wide now-playing one, sent at the D200X wide screen's 458×196.</summary>
+    private static (byte R, byte G, byte B) Pixel(JsonElement setImage, int x, int y, bool wide = false)
     {
         var url = setImage.GetProperty("payload").GetProperty("image").GetString()!;
         using var bmp = SKBitmap.Decode(Convert.FromBase64String(url[(url.IndexOf(',') + 1)..]));
-        Assert.Equal((144, 144), (bmp.Width, bmp.Height));
+        Assert.Equal(wide ? (KeyRenderer.WideWidth, KeyRenderer.WideHeight) : (144, 144), (bmp.Width, bmp.Height));
         var c = bmp.GetPixel(x, y);
         return (c.Red, c.Green, c.Blue);
     }
@@ -237,7 +240,7 @@ public class EndToEndTests
         await opendeck.WaitForAsync(m => IsSetImage(m, "Keypad.0.0") && Pixel(m, 72, 40) is { R: > 180, G: < 80, B: < 80 });
         await opendeck.WaitForAsync(m => IsSetImage(m, "Keypad.5.0") && Pixel(m, 72, 40) is { R: < 80, G: > 150, B: < 100 });
         await opendeck.WaitForAsync(m => IsSetImage(m, "Keypad.10.0") && Pixel(m, 72, 40) is { R: < 80, G: < 100, B: > 180 });
-        await opendeck.WaitForAsync(m => IsSetImage(m, "Keypad.13.0") && Pixel(m, 30, 60) is { R: < 80, G: > 150, B: < 100 });
+        await opendeck.WaitForAsync(m => IsSetImage(m, "Keypad.13.0") && Pixel(m, 30, 60, wide: true) is { R: < 80, G: > 150, B: < 100 });
         await opendeck.WaitForAsync(m => IsSetImage(m, "Keypad.15.0"));
         // only 4 made-for-you items: slot 5 ends up as the dark "empty" key (its first image may still be the connect placeholder)
         await opendeck.WaitForAsync(m => IsSetImage(m, "Keypad.4.0") && Pixel(m, 72, 40) is { R: < 60, G: < 60, B: < 70 });

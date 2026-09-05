@@ -100,8 +100,9 @@ def build_profile(manifest, main_profile, name, wide_mode, wide_fit, like_key=12
             keys[pos] = instance(manifest, "slot", "Keypad", pos, {"row": "recommended", "slot": slot})
             slot += 1
     keys[13] = instance(manifest, "nowplaying", "Keypad", 13, {"layout": "wide"})
-    main_keys = (main_profile or {}).get("keys", [None] * 17)
-    wide = next((k for k in main_keys if k and k["action"]["uuid"] == WIDE_ACTION), None)
+    # the D200X "Wide screen" action: on the D200X plugin's infobar slot (no display, no press) since its 1.3.0, on the dead key 14 before
+    main_slots = (main_profile or {}).get("infobars", []) + (main_profile or {}).get("keys", [None] * 17)
+    wide = next((k for k in main_slots if k and k["action"]["uuid"] == WIDE_ACTION), None)
     wide_settings = None
     if wide_mode or wide_fit:
         wide_settings = dict(wide["settings"]) if wide else {}
@@ -109,7 +110,7 @@ def build_profile(manifest, main_profile, name, wide_mode, wide_fit, like_key=12
             wide_settings["wideMode"] = wide_mode
         if wide_fit:
             wide_settings["wideFit"] = wide_fit
-    keys[14] = retarget(wide, "Keypad", 14, wide_settings)   # the D200X "Wide screen" action (dead cell), per-layout settings
+    infobars = [retarget(wide, "Infobar", 0, wide_settings)]   # per-layout settings for this profile
     keys[15] = instance(manifest, "previous", "Keypad", 15)   # side button 1 (no display)
     keys[16] = instance(manifest, "next", "Keypad", 16)       # side button 2 (no display)
     sliders[0] = instance(manifest, "volumedial", "Encoder", 0, {"mode": "main"})
@@ -117,7 +118,7 @@ def build_profile(manifest, main_profile, name, wide_mode, wide_fit, like_key=12
         ms = main_profile.get("sliders", [])
         sliders[1] = retarget(ms[1] if len(ms) > 1 else None, "Encoder", 1)   # e.g. the PipeWire master volume, as on the main layout
     sliders[2] = instance(manifest, "browsedial", "Encoder", 2)
-    return {"id": name, "keys": keys, "sliders": sliders, "infobars": []}
+    return {"id": name, "keys": keys, "sliders": sliders, "infobars": infobars}
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)

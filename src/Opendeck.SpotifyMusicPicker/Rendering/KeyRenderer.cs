@@ -6,12 +6,14 @@ namespace Opendeck.SpotifyMusicPicker.Rendering;
 
 /// <summary>
 /// Draws key images as PNG data URLs. OpenDeck redraws every key on a 144×144 canvas before it reaches the
-/// device, so that is the native size here; the wide "now playing" image is composed at 288×144 and squeezed
-/// into a square (the D200X plugin's "stretch" fit expands it back to 2:1).
+/// device, so that is the native size here; the wide "now playing" image is the one exception, sent at the
+/// D200X wide screen's own 458×196 (see NowPlayingWideKey).
 /// </summary>
 public sealed class KeyRenderer
 {
     public const int Size = 144;
+    /// <summary>The D200X wide screen: two keys plus the gap between them.</summary>
+    public const int WideWidth = 458, WideHeight = 196;
 
     static readonly SKColor Bg = SKColor.Parse("#121212");
     static readonly SKColor Card = SKColor.Parse("#1F1F24");
@@ -125,13 +127,15 @@ public sealed class KeyRenderer
         return Encode(s, photo: art is not null);
     }
 
-    /// <summary>Now playing for a 2:1 screen: composed at 288×144, then squeezed into the 144 square.
+    /// <summary>Now playing for the D200X wide screen, 458×196: laid out in the 144-tall key space at 336 wide (the same
+    /// 458:196) and rasterised at full size. Sent as it is: stock OpenDeck squeezes it into its 144 square, which the D200X
+    /// plugin's "stretch" fit expands again, and an OpenDeck that renders the wide key at 458×196 draws it one to one.
     /// Nothing that ticks (elapsed time, volume) is drawn: each change would repaint the screen.</summary>
     public string NowPlayingWideKey(PlaybackState? p, byte[]? art, Progress progress = Progress.Coarse)
     {
-        const int W = Size * 2;
-        using var wide = SKSurface.Create(new SKImageInfo(W, Size, SKColorType.Rgba8888, SKAlphaType.Premul));
-        var c = wide.Canvas; c.Clear(Bg);
+        const int W = Size * WideWidth / WideHeight;   // 336
+        using var wide = SKSurface.Create(new SKImageInfo(WideWidth, WideHeight, SKColorType.Rgba8888, SKAlphaType.Premul));
+        var c = wide.Canvas; c.Clear(Bg); c.Scale(WideHeight / (float)Size);
         if (p is null || p.TrackName is null)
         {
             Circle(c, new SKPoint(72, 72), 30, Card);
@@ -153,10 +157,7 @@ public sealed class KeyRenderer
             Circle(c, new SKPoint(W - 24, 22), 14, p.IsPlaying ? Green : Card);
             if (p.IsPlaying) Pause(c, new SKPoint(W - 24, 22), 6, SKColors.Black); else Triangle(c, new SKPoint(W - 23, 22), 8, Text);
         }
-        using var img = wide.Snapshot();
-        using var s = NewSurface();
-        s.Canvas.DrawImage(img, new SKRect(0, 0, Size, Size), Sampling);
-        return Encode(s, photo: art is not null);
+        return Encode(wide, photo: art is not null);
     }
 
     /// <summary>Like / unlike the current track: a heart, filled when the track is in Liked Songs, over the dimmed cover.</summary>

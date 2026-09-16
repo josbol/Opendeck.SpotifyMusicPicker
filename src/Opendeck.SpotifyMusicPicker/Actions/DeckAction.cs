@@ -134,7 +134,9 @@ public sealed class BrowseDialAction : DeckAction
 
     public override Task OnDialRotateAsync(int ticks)
     {
-        Host.Curator.Shift(SettingString("row", "both"), ticks);
+        // inverted: turning clockwise slides the items one slot to the right per tick
+        Host.Curator.Shift(SettingString("row", "both"), -ticks);
+        Host.RenderNow(); // not after RequestRender's 120 ms coalescing: every tick should reach the deck at once
         return Task.CompletedTask;
     }
 

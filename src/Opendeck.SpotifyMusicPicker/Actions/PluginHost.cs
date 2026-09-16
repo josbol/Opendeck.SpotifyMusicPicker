@@ -26,7 +26,8 @@ public sealed class PluginHost : IAsyncDisposable
     private readonly Dictionary<string, string> _sent = new();
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cts = new();
-    private int _renderPending;
+    private int _renderPending, _renderNow;
+    private readonly object _renderLock = new();
     private Task? _login;
 
     public PluginHost(DeckClient deck, Curator curator)
@@ -136,7 +137,7 @@ public sealed class PluginHost : IAsyncDisposable
                 Log.Info($"willAppear {e.Action} @ {e.Context} ({e.Controller})");
                 UpdateVisibility();
                 await action.OnAppearAsync();
-                RenderOne(action, Curator.Current, DateTimeOffset.UtcNow);
+                RenderOne(action);
                 if (count == 1) Deck.GetGlobalSettings();
                 if (Curator.Current.ListsAt == default && action.WantsPlayback) Curator.RequestLists();
                 Curator.RequestPlayback();
@@ -148,7 +149,7 @@ public sealed class PluginHost : IAsyncDisposable
                 Log.Debug($"willDisappear {e.Context}");
                 break;
             case "didReceiveSettings":
-                if (e.Context is not null && Get(e.Context) is { } a1) { a1.Settings = e.Settings.Clone(); RenderOne(a1, Curator.Current, DateTimeOffset.UtcNow); }
+                if (e.Context is not null && Get(e.Context) is { } a1) { a1.Settings = e.Settings.Clone(); RenderOne(a1); }
                 break;
             case "didReceiveGlobalSettings":
                 ApplyGlobalSettings(e.Settings);
@@ -232,19 +233,33 @@ public sealed class PluginHost : IAsyncDisposable
         });
     }
 
+    /// <summary>Renders at once for input that should show without delay (a dial tick). Requests arriving while a pass
+    /// runs fold into one more pass right after it, so a fast spin cannot queue up a backlog of renders.</summary>
+    public void RenderNow()
+    {
+        if (Interlocked.Increment(ref _renderNow) > 1) return;
+        _ = Task.Run(() =>
+        {
+            do { Interlocked.Exchange(ref _renderNow, 1); RenderAll(); }
+            while (Interlocked.CompareExchange(ref _renderNow, 0, 1) != 1);
+        });
+    }
+
     private void RenderAll()
     {
         List<DeckAction> actions;
         lock (_lock) actions = _actions.Values.ToList();
-        var snap = Curator.Current; var now = DateTimeOffset.UtcNow;
-        foreach (var a in actions) RenderOne(a, snap, now);
+        foreach (var a in actions) RenderOne(a);
     }
 
-    private void RenderOne(DeckAction a, Snapshot snap, DateTimeOffset now)
+    private void RenderOne(DeckAction a)
     {
+        // Serialised, and the snapshot is read inside the lock: RenderNow, RequestRender, the tick loop and willAppear
+        // may overlap, and a render that waited must not overwrite a newer image with the state from before it waited.
+        lock (_renderLock)
         try
         {
-            var img = a.Render(snap, now);
+            var img = a.Render(Curator.Current, DateTimeOffset.UtcNow);
             if (img is null || img == a.LastImage) return;
             if (a.LastImage is not null) Log.Debug($"re-sent {a.ActionUuid[UuidPrefix.Length..]} @ {a.Context} ({img.Length / 1024} KiB)");
             a.LastImage = img;

@@ -12,7 +12,7 @@ Layout (5×3 grid, D200X):
   row 0 │ Made for you 1–5
   row 1 │ Most played 1–5
   row 2 │ Suggested 1–2 │ Like / unlike │ Now playing (wide screen) │ D200X wide-screen setting (copied from the main profile)
-  dials │ 0: Spotify volume, press = back to the main layout │ 1: copied from the main profile │ 2: browse dial
+  dials │ 0: Spotify volume, press = back to the layout you came from │ 1: copied from the main profile │ 2: browse dial
   side  │ 1: previous track │ 2: next track
 
 OpenDeck keeps loaded profiles in memory and writes them back on exit: a new profile is picked up when it is
@@ -113,7 +113,7 @@ def build_profile(manifest, main_profile, name, wide_mode, wide_fit, like_key=12
     infobars = [retarget(wide, "Infobar", 0, wide_settings)]   # per-layout settings for this profile
     keys[15] = instance(manifest, "previous", "Keypad", 15)   # side button 1 (no display)
     keys[16] = instance(manifest, "next", "Keypad", 16)       # side button 2 (no display)
-    sliders[0] = instance(manifest, "volumedial", "Encoder", 0, {"mode": "main"})
+    sliders[0] = instance(manifest, "volumedial", "Encoder", 0, {"mode": "back"})   # back to whichever layout opened this one (main layout until the plugin has seen a switch)
     if main_profile:
         ms = main_profile.get("sliders", [])
         sliders[1] = retarget(ms[1] if len(ms) > 1 else None, "Encoder", 1)   # e.g. the PipeWire master volume, as on the main layout

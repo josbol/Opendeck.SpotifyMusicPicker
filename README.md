@@ -15,7 +15,8 @@ the Ulanzi D200X (5×3 keys, a double-width screen, two side buttons, three dial
 - **Like key**: saves the playing song to Liked Songs or removes it (filled heart = liked), like the one in *Essentials
   for Spotify*.
 - **Side buttons**: previous / next song.
-- **Left dial**: Spotify volume; **press = switch between your main layout and the Spotify layout** (and back).
+- **Left dial**: Spotify volume; **press = switch layouts**: to the Spotify layout from any layout you put the dial
+  on, and on the Spotify layout back to the one you came from (or always to a fixed layout, if you prefer).
   The right dial is whatever you already have there (the profile generator copies it from your main layout).
 - **Third dial**: scroll the first two rows (they hold more than five items); press = new suggestions.
 
@@ -40,7 +41,7 @@ Spotify's API rules changed twice (November 2024, February 2026) and this plugin
 | Now playing / transport / volume | the player endpoints (`/me/player…`), `playerctl -p spotify` as fallback |
 | Like | `GET /me/library/contains?uris=`, `PUT` / `DELETE /me/library?uris=` (the old `/me/tracks…` endpoints are gone); needs the `user-library-modify` scope — a version that adds a scope asks you to press *Connect to Spotify* once more |
 | Covers | `GET /albums/{id}`, `GET /playlists/{id}` (batch endpoints were removed, so results are cached on disk) |
-| Layout switch (dial press) | plugins may not send `switchProfile` over the socket, so the message is handed to the running OpenDeck through its single-instance D-Bus hook (`busctl … org.SingleInstance.DBus ExecuteCallback`, a few ms); `opendeck --process-message` (~300 ms) is the fallback |
+| Layout switch (dial press) | plugins may not send `switchProfile` over the socket, so the message is handed to the running OpenDeck through its single-instance D-Bus hook (`busctl … org.SingleInstance.DBus ExecuteCallback`, a few ms); `opendeck --process-message` (~300 ms) is the fallback. *Back to the layout you came from* needs no extra call: an OpenDeck context reads `device.profile.controller.position.index`, so every event names the layout on screen and the plugin remembers the one each device left |
 
 Nothing is sent anywhere but api.spotify.com; the OAuth tokens live in `~/.local/share/opendeck-spotifymusicpicker/tokens.json` (mode 600).
 
@@ -81,7 +82,7 @@ you install as a symlink.
  row 0 │ Made for you 1 │ 2 │ 3 │ 4 │ 5
  row 1 │ Most played 1  │ 2 │ 3 │ 4 │ 5
  row 2 │ Suggested 1 │ 2 │ Like / unlike │ Now playing (wide screen)
- dials │ 0: Spotify volume, press → back to Default │ 1: copied from Default (e.g. PipeWire volume) │ 2: browse / new suggestions
+ dials │ 0: Spotify volume, press → back to the layout you came from │ 1: copied from Default (e.g. PipeWire volume) │ 2: browse / new suggestions
  side  │ 1: previous track │ 2: next track
  infobar │ D200X "Wide screen" action (copied from Default): the slot between the side buttons, no display, no press
 ```
@@ -118,7 +119,10 @@ Plugin log: `~/.local/share/opendeck/logs/plugins/com.josbol.spotifymusicpicker.
 ## Settings
 
 Per key: row (Made for you / Most played / Suggested) and slot; now-playing layout (square / wide) and progress bar; dial press target
-(Spotify layout / main layout / play-pause) and volume step; browse dial rows.
+(Spotify layout / the layout you came from / main layout / play-pause) and volume step; browse dial rows.
+
+*The layout you came from* is the one that last switched this device — the main layout until the plugin has seen a
+switch (it only learns of one while it has a key or dial on screen), or the *Profile override* if you set one.
 
 Plugin-wide (any property inspector → *Plugin-wide settings*): client id and callback port, the two profile names,
 made-for-you links, history window (days), names on covers, preferred playback device, volume step, now-playing
@@ -138,3 +142,6 @@ plugin/com.josbol.spotifymusicpicker.sdPlugin/   manifest, icons, property inspe
 tests/Opendeck.SpotifyMusicPicker.Tests/          xunit: parsing, ranking, PKCE, recommender + FakeSpotify / FakeOpenDeck end-to-end
 scripts/     build.sh, package.sh, install.sh, install-profile.py, make-icons.py, render-docs.sh
 ```
+
+[AGENTS.md](AGENTS.md) has the mechanics behind all of this: the OpenDeck protocol as the plugin uses it, why the
+volume dial and the caches are shaped the way they are, and the traps around profiles, images and releases.

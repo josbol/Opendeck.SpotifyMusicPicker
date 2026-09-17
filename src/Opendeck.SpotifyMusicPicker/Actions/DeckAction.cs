@@ -99,7 +99,7 @@ public sealed class TransportAction : DeckAction
     public override async Task OnKeyUpAsync(DeckEvent e) => Feedback(Next ? await Host.Curator.NextAsync(CancellationToken.None) : await Host.Curator.PreviousAsync(CancellationToken.None));
 }
 
-/// <summary>Dial: rotate = Spotify volume, press = switch between the main and the picker profile (or play/pause when mode = none).</summary>
+/// <summary>Dial: rotate = Spotify volume, press = switch to the picker profile, the main one or back to the layout this one was reached from (or play/pause when mode = none).</summary>
 public sealed class VolumeDialAction : DeckAction
 {
     public override bool WantsPlayback => false;
@@ -117,9 +117,12 @@ public sealed class VolumeDialAction : DeckAction
     public override async Task OnDialUpAsync()
     {
         if (Mode == "none") { await Host.Curator.PlayPauseAsync(CancellationToken.None); return; }
-        var profile = SettingString("profile", Mode == "main" ? Host.Settings.MainProfile : Host.Settings.PickerProfile);
         var device = Device;
         if (device is null) { Log.Warn("dial press: no device id"); return; }
+        // "back" returns to whichever layout switched here, so the Spotify layout can be reached from any of them and left again
+        var profile = Mode == "back" && Host.PreviousProfile(device) is { } previous
+            ? previous
+            : SettingString("profile", Mode == "picker" ? Host.Settings.PickerProfile : Host.Settings.MainProfile);
         if (!await Host.SwitchProfileAsync(device, profile)) Host.Deck.ShowAlert(Context);
     }
 

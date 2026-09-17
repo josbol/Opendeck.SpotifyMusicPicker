@@ -113,7 +113,7 @@
 		{
 			"UUID": "com.josbol.spotifymusicpicker.volumedial",
 			"Name": "Spotify volume + layout switch",
-			"Tooltip": "Rotate: Spotify volume. Press: switch between the main layout and the Spotify layout.",
+			"Tooltip": "Rotate: Spotify volume. Press: switch to the Spotify layout, to the main layout or back to the layout you came from.",
 			"Icon": "icons/dial",
 			"Controllers": [
 				"Encoder",

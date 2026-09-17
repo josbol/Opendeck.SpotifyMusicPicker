@@ -195,12 +195,13 @@ public class CuratorIntegrationTests : IDisposable
 public class EndToEndTests
 {
     /// <summary>Decodes a setImage and reads one pixel; every key image is the 144 square OpenDeck renders, except the
-    /// wide now-playing one, sent at the D200X wide screen's 458×196.</summary>
-    private static (byte R, byte G, byte B) Pixel(JsonElement setImage, int x, int y, bool wide = false)
+    /// wide now-playing one, sent at the D200X wide screen's 458×196. Another size = another image (the square
+    /// placeholder the wide key shows until Spotify has answered): no match, so a wait runs on to the real one.</summary>
+    private static (byte R, byte G, byte B)? Pixel(JsonElement setImage, int x, int y, bool wide = false)
     {
         var url = setImage.GetProperty("payload").GetProperty("image").GetString()!;
         using var bmp = SKBitmap.Decode(Convert.FromBase64String(url[(url.IndexOf(',') + 1)..]));
-        Assert.Equal(wide ? (KeyRenderer.WideWidth, KeyRenderer.WideHeight) : (144, 144), (bmp.Width, bmp.Height));
+        if ((bmp.Width, bmp.Height) != (wide ? (KeyRenderer.WideWidth, KeyRenderer.WideHeight) : (144, 144))) return null;
         var c = bmp.GetPixel(x, y);
         return (c.Red, c.Green, c.Blue);
     }
@@ -272,6 +273,71 @@ public class EndToEndTests
         var pi = await opendeck.WaitForAsync(m => m.GetProperty("event").GetString() == "sendToPropertyInspector" && m.GetProperty("context").GetString() == "Keypad.0.0");
         Assert.True(pi.GetProperty("payload").GetProperty("status").GetProperty("connected").GetBoolean());
         Assert.Equal("Alex", pi.GetProperty("payload").GetProperty("status").GetProperty("user").GetString());
+
+        cts.Cancel();
+        try { await run; } catch (OperationCanceledException) { }
+        curator.Dispose();
+    }
+
+    [Fact]
+    public async Task DialPressOpensTheSpotifyLayoutFromAnyLayoutAndGoesBackToIt()
+    {
+        using var api = new FakeSpotify();
+        Scenario.SetupRoutes(api, DateTimeOffset.UtcNow);
+        using var http = new HttpClient();
+        var (curator, _) = Scenario.NewCurator(api, http);
+        using var opendeck = new FakeOpenDeck();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var deck = new DeckClient(opendeck.Port, "com.josbol.spotifymusicpicker.sdPlugin", "registerPlugin", JsonDocument.Parse("{}").RootElement);
+        await using var host = new PluginHost(deck, curator);
+        var switched = new List<(string Device, string Profile)>();
+        host.ProfileSwitcher = (d, p) => { switched.Add((d, p)); return Task.FromResult(true); };
+        curator.Start();
+        var run = deck.RunAsync(cts.Token);
+        await opendeck.Connected.WaitAsync(TimeSpan.FromSeconds(10));
+
+        const string dial = PluginHost.UuidPrefix + "volumedial";
+        const string device = "ulanzi-d200x";
+        async Task PressAsync(string profile, object settings)
+        {
+            var context = $"{device}.{profile}.Encoder.0.0";
+            await opendeck.WillAppearAsync(dial, context, "Encoder", settings, device);
+            await opendeck.SendAsync(new { @event = "dialUp", action = dial, context, device, payload = new { controller = "Encoder", settings } });
+        }
+        async Task<string> SwitchedToAsync()
+        {
+            var until = DateTime.UtcNow.AddSeconds(5);
+            while (switched.Count == 0 && DateTime.UtcNow < until) await Task.Delay(50);
+            var last = Assert.Single(switched);
+            switched.Clear();
+            Assert.Equal(device, last.Device);
+            return last.Profile;
+        }
+
+        await opendeck.WaitForAsync(m => m.GetProperty("event").GetString() == "registerPlugin");
+        // a plugin (re)load: OpenDeck announces every instance of every loaded layout, whichever one the deck shows
+        foreach (var profile in new[] { "Music", "Main", "AI Agents" })
+            await opendeck.WillAppearAsync(dial, $"{device}.{profile}.Encoder.0.0", "Encoder", new { mode = profile == "Music" ? "back" : "picker" }, device);
+        await opendeck.WaitForAsync(m => m.GetProperty("event").GetString() == "getGlobalSettings");
+        await opendeck.SendAsync(new { @event = "didReceiveGlobalSettings", payload = new { settings = new { mainProfile = "Main", pickerProfile = "Music", volumeStep = 5, showLabels = true } } });
+
+        // "back" before the plugin has seen a switch (the announcements say nothing about what is on screen): the main layout
+        await PressAsync("AI Agents", new { mode = "back" });
+        Assert.Equal("Main", await SwitchedToAsync());
+
+        // from any layout to the Spotify one…
+        await PressAsync("AI Agents", new { mode = "picker" });
+        Assert.Equal("Music", await SwitchedToAsync());
+
+        // …and back to the one it was opened from, not to the main layout
+        await PressAsync("Music", new { mode = "back" });
+        Assert.Equal("AI Agents", await SwitchedToAsync());
+
+        // the same dial pressed on the main layout: there and back again
+        await PressAsync("Main", new { mode = "picker" });
+        Assert.Equal("Music", await SwitchedToAsync());
+        await PressAsync("Music", new { mode = "back" });
+        Assert.Equal("Main", await SwitchedToAsync());
 
         cts.Cancel();
         try { await run; } catch (OperationCanceledException) { }

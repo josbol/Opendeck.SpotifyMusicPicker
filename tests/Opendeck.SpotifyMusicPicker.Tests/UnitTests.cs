@@ -216,6 +216,17 @@ public class DeckEventTests
         var bare = DeckEvent.Parse("""{"event":"systemDidWakeUp"}""");
         Assert.Null(bare.Context); Assert.Null(bare.Coordinates); Assert.Equal(0, bare.Ticks);
     }
+
+    [Fact]
+    public void ReadsTheLayoutOffTheContext()
+    {
+        Assert.Equal("Spotify", PluginHost.ProfileFromContext("ulanzi-d200x.Spotify.Encoder.0.0", "ulanzi-d200x"));
+        Assert.Equal("AI Agents", PluginHost.ProfileFromContext("ulanzi-d200x.AI Agents.Keypad.15.0", "ulanzi-d200x"));
+        Assert.Equal("v1.2", PluginHost.ProfileFromContext("ulanzi-d200x.v1.2.Keypad.3.0", "ulanzi-d200x"));   // dots in the name
+        Assert.Null(PluginHost.ProfileFromContext("Encoder.0.0", "ulanzi-d200x"));                             // not an OpenDeck context
+        Assert.Null(PluginHost.ProfileFromContext("ulanzi-d200x.Spotify.Encoder.0.0", "other-device"));
+        Assert.Null(PluginHost.ProfileFromContext(null, "ulanzi-d200x"));
+    }
 }
 
 [Collection("paths")]

@@ -24,6 +24,8 @@ public sealed class PluginHost : IAsyncDisposable
     /// <summary>Last image sent per context, kept across willDisappear/willAppear: OpenDeck stores it with the key and
     /// draws it itself when the layout comes back, so sending it again would only make its renderer work twice.</summary>
     private readonly Dictionary<string, string> _sent = new();
+    /// <summary>Per device: the layout it shows and the one it showed before that (where a "back" dial press returns to).</summary>
+    private readonly Dictionary<string, (string? Current, string? Previous)> _profiles = new();
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cts = new();
     private int _renderPending, _renderNow;
@@ -43,7 +45,12 @@ public sealed class PluginHost : IAsyncDisposable
 
     public async Task<bool> SwitchProfileAsync(string device, string profile)
     {
-        if (ProfileSwitcher is not null) return await ProfileSwitcher(device, profile);
+        if (ProfileSwitcher is not null)
+        {
+            var handled = await ProfileSwitcher(device, profile);
+            if (handled) NoteProfile(device, profile);
+            return handled;
+        }
         var message = Json.Serialize(new { @event = "switchProfile", device, profile });
         // Fastest: hand the CLI arguments straight to the running OpenDeck through its single-instance D-Bus hook
         // (what `opendeck --process-message` does after ~300 ms of Tauri start-up). Then the CLI itself.
@@ -66,12 +73,41 @@ public sealed class PluginHost : IAsyncDisposable
                 await p.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
                 if (p.ExitCode != 0) { Log.Debug($"{file} exit {p.ExitCode}: {(await p.StandardError.ReadToEndAsync()).Trim()}"); continue; }
                 Log.Info($"switchProfile {device} → '{profile}' via {file} in {started.ElapsedMilliseconds} ms");
+                NoteProfile(device, profile);
                 return true;
             }
             catch (Exception ex) { Log.Debug($"{file}: {ex.Message}"); }
         }
         Log.Warn("Could not reach OpenDeck to switch profiles (D-Bus and CLI both failed)");
         return false;
+    }
+
+    /// <summary>The layout this device showed before the one it shows now, as far as the plugin has seen; null until it sees a switch.</summary>
+    public string? PreviousProfile(string device) { lock (_lock) return _profiles.TryGetValue(device, out var p) ? p.Previous : null; }
+
+    /// <summary>An OpenDeck context reads "device.profile.controller.position.index", so every event names the layout on screen.</summary>
+    public static string? ProfileFromContext(string? context, string? device)
+    {
+        if (context is null || device is null || !context.StartsWith(device + ".", StringComparison.Ordinal)) return null;
+        var parts = context[(device.Length + 1)..].Split('.');    // a profile name may hold dots; the last three segments never do
+        return parts.Length < 4 ? null : string.Join('.', parts[..^3]) is { Length: > 0 } profile ? profile : null;
+    }
+
+    /// <summary>Notes which layout a device shows; the one it leaves becomes the target of a "back" dial press.
+    /// The event that triggers a switch is itself noted first, so a switch made elsewhere (the OpenDeck window, an
+    /// application profile) is corrected by the very press that wants to go back.</summary>
+    private void NoteProfile(string? device, string? profile)
+    {
+        if (device is null || profile is null) return;
+        string? left;
+        lock (_lock)
+        {
+            var known = _profiles.GetValueOrDefault(device);
+            if (known.Current == profile) return;
+            left = known.Current;
+            _profiles[device] = (profile, left ?? known.Previous);
+        }
+        Log.Info($"{device} shows '{profile}'" + (left is null ? "" : $" (came from '{left}')"));
     }
 
     // ---- login from the property inspector ---------------------------------------------------
@@ -125,6 +161,10 @@ public sealed class PluginHost : IAsyncDisposable
 
     private async Task OnDeckEventAsync(DeckEvent e)
     {
+        // Only a press or a turn proves which layout is on screen: OpenDeck sends willAppear for every instance of
+        // every loaded profile when the plugin (re)starts, and willDisappear for the layout being left.
+        if (e.Event is "keyDown" or "keyUp" or "dialRotate" or "dialDown" or "dialUp" or "touchTap")
+            NoteProfile(e.Device, ProfileFromContext(e.Context, e.Device));
         switch (e.Event)
         {
             case "willAppear":
